@@ -1,0 +1,13 @@
+=== Preprocessing Summary ===
+
+Revision Model: gpt-3.5-turbo
+Timestamp: 2025-07-16 03:42:41
+Total Human Texts: 3931
+Total AI Texts: 3933
+
+Files created:
+- ./preprocessed_data\human_original_texts.json
+- ./preprocessed_data\human_revised_texts.json
+- ./preprocessed_data\ai_original_texts.json
+- ./preprocessed_data\ai_revised_texts.json
+- ./preprocessed_data\combined_dataset.pkl
