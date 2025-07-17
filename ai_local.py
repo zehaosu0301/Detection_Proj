@@ -913,7 +913,7 @@ class DataLoader:
         if path == "sample":
             return self.create_sample_dataset()
         elif path == "test":
-            return self.create_origin_dataset()
+            return self.load_origin_dataset()
 
         # 如果是相对路径，添加数据目录前缀
         if not os.path.isabs(path) and not os.path.exists(path):
@@ -1114,7 +1114,7 @@ class DataLoader:
         logger.info(f"Created sample dataset with {len(df)} examples")
         return df
 
-    def create_origin_dataset(self) -> pd.DataFrame:
+    def load_origin_dataset(self) -> pd.DataFrame:
         """Load finance dataset from JSON Lines format"""
         files = self.find_finance_data_files()
 
@@ -1259,9 +1259,9 @@ def load_finance_dataset() -> pd.DataFrame:
     return loader.load_finance_dataset()
 
 
-def create_origin_dataset() -> pd.DataFrame:
+def load_origin_dataset() -> pd.DataFrame:
     loader = DataLoader()
-    return loader.create_origin_dataset
+    return loader.load_origin_dataset
 
 
 def create_sample_dataset() -> pd.DataFrame:
@@ -1341,7 +1341,7 @@ def main(
     labels = df["label"].tolist()
 
     # 2. 数据分割（70% 训练，30% 测试）
-    split_idx = int(len(texts) * 0)
+    split_idx = int(len(texts) * 0.7)
     train_texts, test_texts = texts[:split_idx], texts[split_idx:]
     train_labels, test_labels = labels[:split_idx], labels[split_idx:]
 
@@ -1562,12 +1562,12 @@ if __name__ == "__main__":
 
             config = DetectionConfig(
                 revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
-                embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-fast",
+                embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
                 perturbation_rate=0.15,
-                use_ml_classifier=False,
-                similarity_threshold=0.698,
+                use_ml_classifier=True,
+                similarity_threshold=0.705,  # 0.705,.698
             )
-            main(data_path="test", max_samples=20, use_cache=True, config=config)
+            main(data_path="test", max_samples=500, use_cache=True, config=config)
         except Exception as e:
             print(f"\nError with finance dataset: {e}")
             print("Falling back to sample dataset...")
