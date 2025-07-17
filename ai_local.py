@@ -27,8 +27,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # OpenAI library imports
+import asyncio
 import openai  # Good for catching error types like openai.RateLimitError
 from openai import OpenAI
+from openai import AsyncOpenAI
 import tiktoken
 
 # 基础库
@@ -314,7 +316,10 @@ class EnhancedLLMReviser:
                     "请在DetectionConfig中提供api_key或设置OPENAI_API_KEY环境变量"
                 )
 
-            self.client = OpenAI(api_key=api_key, base_url=self.config.base_url)
+            # self.client = OpenAI(api_key=api_key, base_url=self.config.base_url)
+            self.client = AsyncOpenAI(
+                api_key=api_key, base_url=self.config.base_url
+            )  # Using Asynchronous Clients
             self.max_retries = 3
             self.retry_delay = 1.0
             print(f"OpenAI client initialized for model: {model_name}")
@@ -325,7 +330,10 @@ class EnhancedLLMReviser:
                 f"Warning: Unknown revision model '{model_name}'. Will use rule-based fallback."
             )
 
-    def revise(self, text: str, cache: Dict[str, str]) -> str:
+    # def revise(self, text: str, cache: Dict[str, str]) -> str:
+    async def revise(
+        self, text: str, cache: Dict[str, str]
+    ) -> str:  # change to async def
         """
         使用LLM重写文本
 
@@ -346,15 +354,17 @@ class EnhancedLLMReviser:
         try:
             model_name = self.config.revision_model
             revised = ""
-            if model_name.startswith("t5"):
-                revised = self._revise_with_t5(text)
-                # print(f"t5 rewrite: {revised}")
-            elif model_name == "gpt2":
-                revised = self._revise_with_gpt2(text)
-                # print(f"gpt2 rewrite: {revised}")
+            if model_name.startswith("t5") or model_name == "gpt2":
+                if model_name.startswith("t5"):
+                    revised = self._revise_with_t5(text)
+                    # print(f"t5 rewrite: {revised}")
+                else:  # gpt2
+                    revised = self._revise_with_gpt2(text)
+                    # print(f"gpt2 rewrite: {revised}")
             elif model_name.startswith("gpt-"):
                 # api rewrite
-                revised = self._revise_with_api(text)
+                # revised = self._revise_with_api(text)
+                revised = await self._revise_with_api(text)  # change to await
                 # print(f"gpt3.5 rewrite: {revised}")
             else:
                 revised = self._rule_based_revision(text)
@@ -409,13 +419,20 @@ class EnhancedLLMReviser:
             ]
             prompt = np.random.choice(prompt_templates)
             inputs = self.tokenizer.encode(
-                prompt, return_tensors="pt", max_length=512, truncation=True
-            ).to(self.device)
+                prompt,
+                return_tensors="pt",
+                max_length=512,
+                truncation=True,
+                padding=True,  # Ensure padding is enabled to handle the mask
+            )
+            input_ids = inputs.input_ids.to(self.device)
+            attention_mask = inputs.attention_mask.to(self.device)
 
             with torch.no_grad():
                 outputs = self.model.generate(
-                    inputs,
-                    max_length=min(len(inputs[0]) + 100, 1024),
+                    input_ids=input_ids,  # Pass input_ids explicitly
+                    attention_mask=attention_mask,
+                    max_length=min(len(input_ids[0]) + 100, 1024),
                     num_return_sequences=1,
                     temperature=0.8,
                     do_sample=True,
@@ -423,7 +440,7 @@ class EnhancedLLMReviser:
                     pad_token_id=self.tokenizer.eos_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     no_repeat_ngram_size=3,
-                    early_stopping=True,
+                    # early_stopping=True,
                 )
 
             #
@@ -453,7 +470,8 @@ class EnhancedLLMReviser:
             print(f"  修复版重写失败: {e}")
             return text
 
-    def _revise_with_api(self, text: str) -> str:
+    # def _revise_with_api(self, text: str) -> str:
+    async def _revise_with_api(self, text: str) -> str:  # change to async def
         """Use OpenAI API with better prompting strategy"""
         if not self.client:
             raise ValueError("OpenAI client not initialized.")
@@ -475,7 +493,7 @@ The more casual or informal the original text, the more changes you should make.
 
         for attempt in range(self.max_retries):
             try:
-                response = self.client.chat.completions.create(
+                response = await self.client.chat.completions.create(  # change to await
                     model=self.config.revision_model,
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -489,7 +507,9 @@ The more casual or informal the original text, the more changes you should make.
             except Exception as e:
                 print(f"API error (attempt {attempt + 1}): {e}")
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
+                    await asyncio.time.sleep(
+                        self.retry_delay
+                    )  # Using asynchronous sleep
                 else:
                     return text
 
@@ -739,61 +759,63 @@ class AITextDetector:
         self.classifier = None
         self.scaler = StandardScaler()
         self.cache = {}
+        self.api_concurrency_limit = asyncio.Semaphore(10)
 
-    def detect_batch(
+    async def detect_batch(
         self, texts: List[str], labels: Optional[List[int]] = None
-    ) -> Dict[str, np.ndarray]:
+    ) -> Dict[str, np.ndarray]:  # change to async def
         """
-        批量检测文本
+        Batch text detection
 
         Args:
-            texts: 文本列表
-            labels: 真实标签（可选，用于训练）
+            texts: text list
+            labels: Real labelling
         Returns:
-            包含预测结果和特征的字典
+            Dictionary containing prediction results and features
         """
         all_features = []
         all_scores = []
+        if not texts:
+            # Handle the case where an empty list is passed
+            return {
+                "predictions": np.array([]),
+                "probabilities": np.array([]),
+                "features": np.array([]),
+                "similarity_scores": np.array([]),
+            }
+
+        async def revise_with_limit(p_text):
+            # 在调用前获取信号量
+            async with self.api_concurrency_limit:
+                # 调用会等待，直到信号量可用
+                return await self.reviser.revise(p_text, self.cache)
 
         print("Processing texts...")
-        for i, text in enumerate(tqdm(texts)):
-            try:
-                # 1. 扰动
-                perturbed = self.perturber.perturb(text)
 
-                # 2. LLM重写
-                revised = self.reviser.revise(perturbed, self.cache)
+        # 1. First, scramble all the text (this part is CPU intensive and can be done synchronously)
+        perturbed_texts = [
+            self.perturber.perturb(text) for text in tqdm(texts, desc="Perturbing")
+        ]
 
-                # 3. 特征提取
-                features = self.feature_extractor.extract_features(text, revised)
-                all_features.append(features)
+        # 2. Create a list of all LLM rewrite tasks
+        # This part is only truly parallel if the model is an API model
+        print(f"Revising texts with {self.reviser.config.revision_model}...")
+        revision_tasks = [revise_with_limit(p_text) for p_text in perturbed_texts]
 
-                # 4. 主要相似度分数
-                all_scores.append(features["semantic_similarity"])
+        # 3. Use asyncio.gather to perform all rewrite tasks concurrently
+        # tqdm integrates well with asyncio.gather to show progress
+        all_revised_texts = await asyncio.gather(*revision_tasks)
 
-            except Exception as e:
-                print(f"Error processing text {i}: {e}")
-                # 使用默认值
-                default_features = {
-                    key: 0.5
-                    for key in [
-                        "semantic_similarity",
-                        "word_overlap_ratio",
-                        "vocabulary_change_ratio",
-                        "unique_words_ratio",
-                        "stopword_ratio_change",
-                        "sentence_count_ratio",
-                        "avg_sentence_length_change",
-                        "punctuation_ratio_change",
-                        "capitalization_ratio_change",
-                        "avg_word_length_change",
-                        "char_level_similarity",
-                        "word_level_similarity",
-                        "length_ratio",
-                    ]
-                }
-                all_features.append(default_features)
-                all_scores.append(0.5)
+        # 4. Extract features sequentially
+        print("Extracting features...")
+        for i, original_text in enumerate(texts):
+            # The order is preserved, so we can safely pair original and revised texts.
+            revised_text = all_revised_texts[i]
+            features = self.feature_extractor.extract_features(
+                original_text, revised_text
+            )
+            all_features.append(features)
+            all_scores.append(features.get("semantic_similarity", 0.5))
 
         # 转换为特征矩阵
         feature_matrix = pd.DataFrame(all_features).fillna(0).values
@@ -1105,10 +1127,10 @@ class DataLoader:
         sample_data = {
             "id": range(6),
             "text": [
-                "There is most likely an error in the WSJ's data.  Yahoo! Finance reports the P\/E on the Russell 2000 to be 15 as of 8\/31\/11 and S&P 500 P\/E to be 13 (about the same as WSJ). Good catch, though!  E-mail WSJ, perhaps they will be grateful.",
+                "There is most likely an error in the WSJ's data.  Yahoo! Finance reports the PE on the Russell 2000 to be 15 as of 83111 and SP 500 PE to be 13 (about the same as WSJ). Good catch, though!  E-mail WSJ, perhaps they will be grateful.",
                 "I know this question has a lot of answers already, but I feel the answers are phrased either strongly against, or mildly for, co-signing. What it amounts down to is that this is a personal choice. You cannot receive reliable information as to whether or not co-signing this loan is a good move due to lack of information. The person involved is going to know the person they would be co-signing for, and the people on this site will only have their own personal preferences of experiences to draw from. You know if they are reliable, if they will be able to pay off the loan without need for the banks to come after you.  This site can offer general theories, but I think it should be kept in mind that this is wholly a personal decision for the person involved, and them alone to make based on the facts that they know and we do not.",
                 "I think the best investment strategy is to diversify your portfolio across different asset classes.",
-                "Historical price-to-earnings (P\/E) ratios for small-cap and large-cap stocks can vary significantly over time and may not be directly comparable due to the different characteristics of these two categories of stocks.Small-cap stocks, which are defined as stocks with a market capitalization of less than $2 billion, tend to be riskier and more volatile than large-cap stocks, which have a market capitalization of $10 billion or more. As a result, investors may be willing to pay a higher price for the potential growth opportunities offered by small-cap stocks, which can lead to higher P\/E ratios.On the other hand, large-cap stocks tend to be more established and stable, with a longer track record of earnings and revenue growth. As a result, these stocks may trade at lower P\/E ratios, as investors may be less willing to pay a premium for their growth potential.It is important to note that P\/E ratios are just one factor to consider when evaluating a stock and should not be used in isolation. Other factors, such as the company's financial health, industry trends, and macroeconomic conditions, can also impact a stock's P\/E ratio.",
+                "Historical price-to-earnings (PE) ratios for small-cap and large-cap stocks can vary significantly over time and may not be directly comparable due to the different characteristics of these two categories of stocks.Small-cap stocks, which are defined as stocks with a market capitalization of less than $2 billion, tend to be riskier and more volatile than large-cap stocks, which have a market capitalization of $10 billion or more. As a result, investors may be willing to pay a higher price for the potential growth opportunities offered by small-cap stocks, which can lead to higher PE ratios.On the other hand, large-cap stocks tend to be more established and stable, with a longer track record of earnings and revenue growth. As a result, these stocks may trade at lower PE ratios, as investors may be less willing to pay a premium for their growth potential.It is important to note that PE ratios are just one factor to consider when evaluating a stock and should not be used in isolation. Other factors, such as the company's financial health, industry trends, and macroeconomic conditions, can also impact a stock's PE ratio.",
                 "Co-signing a personal loan for a friend or family member can be a risky proposition. When you co-sign a loan, you are agreeing to be responsible for the loan if the borrower is unable to make the payments. This means that if your friend or family member defaults on the loan, you will be on the hook for the remaining balance.There are a few things to consider before co-signing a personal loan for someone:Do you trust the borrower to make the payments on time and in full? If you are not confident that the borrower will be able to make the payments, it may not be a good idea to co-sign the loan.Can you afford to make the payments if the borrower defaults? If you are unable to make the payments, co-signing the loan could put your own financial stability at risk.What is the purpose of the loan? If the borrower is using the loan for a risky or questionable venture, it may not be worth the risk to co-sign.Is there another way for the borrower to get the loan without a co-signer? If the borrower has a good credit score and is able to qualify for a loan on their own, it may not be necessary for you to co-sign.In general, it is important to carefully consider the risks and potential consequences before co-signing a loan for someone. If you do decide to co-sign, it is a good idea to have a conversation with the borrower about their plans for making the loan payments and to have a clear understanding of your responsibilities as a co-signer.",
                 "The optimal approach to risk management involves careful assessment of market conditions.",
             ],
@@ -1413,7 +1435,7 @@ def plot_classification_metrics(results: Dict):
 
 
 # 主执行函数
-def main(
+async def main(
     data_path: str = "finance",
     max_samples: Optional[int] = None,
     use_cache: bool = True,
@@ -1428,6 +1450,14 @@ def main(
         use_cache: 是否使用缓存
         config: 检测器配置
     """
+
+    SEED = 42
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
+
     print("=== Enhanced AI Text Detection ===")
     print(
         f"Method: Multi-feature extraction with {config.revision_model if config else 'default model'}"
@@ -1446,7 +1476,7 @@ def main(
     labels = df["label"].tolist()
 
     # 2. 数据分割（70% 训练，30% 测试）
-    split_idx = int(len(texts) * 0.7)
+    split_idx = int(len(texts) * 0.6)
     train_texts, test_texts = texts[:split_idx], texts[split_idx:]
     train_labels, test_labels = labels[:split_idx], labels[split_idx:]
 
@@ -1475,11 +1505,11 @@ def main(
     print(
         "Train labels distribution:", pd.Series(train_labels).value_counts().to_dict()
     )
-    train_results = detector.detect_batch(train_texts, train_labels)
+    train_results = await detector.detect_batch(train_texts, train_labels)
 
     # 6. 测试阶段
     print("\n=== Testing Phase ===")
-    test_results = detector.detect_batch(test_texts)
+    test_results = await detector.detect_batch(test_texts)
 
     # 7. 评估结果
     test_predictions = test_results["predictions"]
@@ -1566,7 +1596,7 @@ def main(
 
 
 # 实验对比函数
-def run_comparison_experiment(
+async def run_comparison_experiment(
     data_path: str = "finance", max_samples: Optional[int] = None
 ):
     """
@@ -1593,6 +1623,7 @@ def run_comparison_experiment(
             revision_model="gpt-3.5-turbo",
             embedding_model="paraphrase-MiniLM-L6-v2",
             use_ml_classifier=True,
+            similarity_threshold=0.88,
         ),
         "gpt3.5 with funed model": DetectionConfig(
             revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
@@ -1615,7 +1646,9 @@ def run_comparison_experiment(
     for name, config in configurations.items():
         print(f"\n{'='*20} Running: {name} {'='*20}")
         try:
-            results[name] = main(data_path, max_samples, use_cache=True, config=config)
+            results[name] = await main(
+                data_path, max_samples, use_cache=True, config=config
+            )
         except Exception as e:
             print(f"!!!!!! Experiment '{name}' failed: {e} !!!!!!")
 
@@ -1654,7 +1687,7 @@ if __name__ == "__main__":
     if mode == "compare":
         # 运行对比实验
         print("Running comparison experiment...")
-        run_comparison_experiment(data_path="finance", max_samples=400)
+        asyncio.run(run_comparison_experiment(data_path="test", max_samples=500))
 
     elif mode == "quick":
         # 快速测试
@@ -1665,7 +1698,7 @@ if __name__ == "__main__":
             perturbation_rate=0.15,
             use_ml_classifier=False,  # 不训练分类器，只用阈值
         )
-        main(data_path="sample", max_samples=500, config=config)
+        asyncio.run(main(data_path="sample", max_samples=500, config=config))
 
     elif mode == "api":
         print("Running api experiment with finance dataset...")
@@ -1676,13 +1709,15 @@ if __name__ == "__main__":
                 revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
                 embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
                 perturbation_rate=0.15,
-                use_ml_classifier=True,
-                similarity_threshold=0.705,  # 0.705,.698
+                use_ml_classifier=False,
+                similarity_threshold=0.7,  # 0.705,.698
             )
-            main(data_path="test", max_samples=500, use_cache=True, config=config)
+            asyncio.run(
+                main(data_path="finance", max_samples=50, use_cache=True, config=config)
+            )  # use asyncio.run()
         except Exception as e:
             print(f"\nError with finance dataset: {e}")
             print("Falling back to sample dataset...")
-            main(data_path="sample", max_samples=200)
+            asyncio.run(main(data_path="sample", max_samples=200))  # use asyncio.run()
 
     print("\n Experiment completed!")
