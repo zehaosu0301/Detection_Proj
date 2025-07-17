@@ -37,11 +37,16 @@ from sklearn.metrics import (
     accuracy_score,
     classification_report,
     confusion_matrix,
+    roc_curve,
+    precision_recall_curve,
 )
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import torch
 
+# 可视化库
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 import os, time, hashlib, json, random
 from typing import List, Tuple
@@ -1307,6 +1312,106 @@ def evaluate_detector(
     return metrics
 
 
+# ==============================================================================
+
+
+def plot_roc_curves(results: Dict):
+    """绘制所有实验的ROC曲线"""
+    plt.figure(figsize=(10, 8))
+    for name, result_data in results.items():
+        fpr, tpr, _ = roc_curve(
+            result_data["test_labels"], result_data["test_results"]["probabilities"]
+        )
+        auc = roc_auc_score(
+            result_data["test_labels"], result_data["test_results"]["probabilities"]
+        )
+        plt.plot(fpr, tpr, label=f"{name} (AUC = {auc:.3f})")
+    plt.plot([0, 1], [0, 1], "k--", label="Chance")
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curves Comparison")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+def plot_precision_recall_curves(results: Dict):
+    """绘制所有实验的Precision-Recall曲线"""
+    plt.figure(figsize=(10, 8))
+    for name, result_data in results.items():
+        precision, recall, _ = precision_recall_curve(
+            result_data["test_labels"], result_data["test_results"]["probabilities"]
+        )
+        plt.plot(recall, precision, label=f"{name}")
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+    plt.title("Precision-Recall Curves Comparison")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+def plot_confusion_matrices(results: Dict):
+    """绘制所有实验的混淆矩阵"""
+    n_results = len(results)
+    fig, axes = plt.subplots(1, n_results, figsize=(6 * n_results, 5))
+    if n_results == 1:
+        axes = [axes]  # Make it iterable
+    for ax, (name, result_data) in zip(axes, results.items()):
+        cm = confusion_matrix(
+            result_data["test_labels"], result_data["test_results"]["predictions"]
+        )
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            ax=ax,
+            cbar=False,
+            xticklabels=["Human", "AI"],
+            yticklabels=["Human", "AI"],
+        )
+        ax.set_title(f"Confusion Matrix: {name}")
+        ax.set_xlabel("Predicted Label")
+        ax.set_ylabel("True Label")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_classification_metrics(results: Dict):
+    """将关键分类指标（P, R, F1）绘制成条形图进行比较"""
+    metrics_data = []
+    for name, result_data in results.items():
+        report = classification_report(
+            result_data["test_labels"],
+            result_data["test_results"]["predictions"],
+            target_names=["Human", "AI"],
+            output_dict=True,
+        )
+        # 只关注AI类别的指标
+        ai_metrics = report["AI"]
+        metrics_data.append(
+            {
+                "Configuration": name,
+                "Precision": ai_metrics["precision"],
+                "Recall": ai_metrics["recall"],
+                "F1-Score": ai_metrics["f1-score"],
+            }
+        )
+
+    df = pd.DataFrame(metrics_data)
+    df_melted = df.melt(id_vars="Configuration", var_name="Metric", value_name="Score")
+
+    plt.figure(figsize=(12, 7))
+    sns.barplot(data=df_melted, x="Configuration", y="Score", hue="Metric")
+    plt.title('Classification Metrics for "AI" Class')
+    plt.ylabel("Score")
+    plt.xticks(rotation=15)
+    plt.ylim(0, 1.05)
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.show()
+
+
 # 主执行函数
 def main(
     data_path: str = "finance",
@@ -1379,8 +1484,6 @@ def main(
     # 7. 评估结果
     test_predictions = test_results["predictions"]
     test_probabilities = test_results["probabilities"]
-
-    from sklearn.metrics import confusion_matrix
 
     # 计算指标
     accuracy = accuracy_score(test_labels, test_predictions)
@@ -1456,6 +1559,7 @@ def main(
     return {
         "detector": detector,
         "test_results": test_results,
+        "test_labels": test_labels,
         "accuracy": accuracy,
         "auc": auc,
     }
@@ -1472,59 +1576,67 @@ def run_comparison_experiment(
 
     results = {}
 
-    # 配置1: T5-small
-    print("\n1. Testing with T5-small...")
-    config1 = DetectionConfig(
-        revision_model="t5-small",
-        embedding_model="all-MiniLM-L6-v2",
-        perturbation_rate=0.15,
-        use_ml_classifier=True,
-    )
-    results["t5"] = main(data_path, max_samples, use_cache=True, config=config1)
-
-    # 配置2: GPT-2
-    print("\n2. Testing with GPT-2...")
-    config2 = DetectionConfig(
-        revision_model="gpt2",
-        embedding_model="all-MiniLM-L6-v2",
-        perturbation_rate=0.15,
-        use_ml_classifier=True,
-    )
-    results["gpt2"] = main(data_path, max_samples, use_cache=True, config=config2)
-
-    # 配置3: GPT-3.5-Turbo (API模型)
-    print("\n3. Testing with GPT-3.5-Turbo API...")
-
-    base_url = "https://api.bltcy.ai/v1"
-    config3 = DetectionConfig(revision_model="gpt-3.5-turbo")
-    results["gpt3.5"] = main(data_path, max_samples, use_cache=True, config=config3)
-
-    # 配置4: 不同扰动率
-    print("\n3. Testing with higher perturbation rate...")
-    config4 = DetectionConfig(
-        revision_model="t5-small",
-        embedding_model="all-MiniLM-L6-v2",
-        perturbation_rate=0.25,
-        perturbation_methods=["synonym", "contextual", "random_swap"],
-        use_ml_classifier=True,
-    )
-    results["high_perturb"] = main(
-        data_path, max_samples, use_cache=True, config=config4
-    )
+    configurations = {
+        "t5-small with Allmini": DetectionConfig(
+            revision_model="t5-small",
+            embedding_model="all-MiniLM-L6-v2",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        "GPT-2 with allMini": DetectionConfig(
+            revision_model="gpt2",
+            embedding_model="all-MiniLM-L6-v2",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        "gpt3.5 with paraphrase model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="paraphrase-MiniLM-L6-v2",
+            use_ml_classifier=True,
+        ),
+        "gpt3.5 with funed model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
+            embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+            similarity_threshold=0.705,  # 0.705,.698
+        ),
+        # "High_Perturb": DetectionConfig(
+        #     revision_model="t5-small",
+        #     embedding_model="all-MiniLM-L6-v2",
+        #     perturbation_rate=0.25,
+        #     perturbation_methods=["synonym", "contextual", "random_swap"],
+        #     use_ml_classifier=True,
+        # ),
+    }
 
     # 比较结果
-    print("\n=== Comparison Results ===")
+    # Run experiments
+    for name, config in configurations.items():
+        print(f"\n{'='*20} Running: {name} {'='*20}")
+        try:
+            results[name] = main(data_path, max_samples, use_cache=True, config=config)
+        except Exception as e:
+            print(f"!!!!!! Experiment '{name}' failed: {e} !!!!!!")
+
+    # Compare results textually
+    print("\n\n=== Final Comparison Summary ===")
     print(f"{'Configuration':<20} {'Accuracy':<10} {'AUC':<10}")
     print("-" * 40)
-    print(
-        f"{'T5-small':<20} {results['t5']['accuracy']:<10.4f} {results['t5']['auc']:<10.4f}"
-    )
-    print(
-        f"{'GPT-2':<20} {results['gpt2']['accuracy']:<10.4f} {results['gpt2']['auc']:<10.4f}"
-    )
-    print(
-        f"{'High Perturbation':<20} {results['high_perturb']['accuracy']:<10.4f} {results['high_perturb']['auc']:<10.4f}"
-    )
+    for name, result_data in results.items():
+        print(
+            f"{name:<20} {result_data['accuracy']:<10.4f} {result_data['auc']:<10.4f}"
+        )
+
+    # Visualize results
+    print("\n\nGenerating visualizations...")
+    if results:
+        plot_roc_curves(results)
+        plot_precision_recall_curves(results)
+        plot_confusion_matrices(results)
+        plot_classification_metrics(results)
+    else:
+        print("No successful experiments to visualize.")
 
     return results
 
