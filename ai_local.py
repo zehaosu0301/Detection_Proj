@@ -1434,6 +1434,25 @@ def plot_classification_metrics(results: Dict):
     plt.show()
 
 
+def find_optimal_threshold(labels: List[int], scores: np.ndarray) -> float:
+    """
+    Find the optimal classification threshold using the ROC curve.
+
+    The optimal threshold is the one that maximizes the difference
+    between the true positive rate (TPR) and the false positive rate (FPR).
+    """
+    fpr, tpr, thresholds = roc_curve(labels, scores)
+
+    # Calculate the optimal threshold
+    optimal_idx = np.argmax(tpr - fpr)
+    optimal_threshold = thresholds[optimal_idx]
+
+    print(
+        f"\nFound optimal similarity threshold from training data: {optimal_threshold:.4f}"
+    )
+    return optimal_threshold
+
+
 # 主执行函数
 async def main(
     data_path: str = "finance",
@@ -1506,6 +1525,13 @@ async def main(
         "Train labels distribution:", pd.Series(train_labels).value_counts().to_dict()
     )
     train_results = await detector.detect_batch(train_texts, train_labels)
+    # If not using the ML classifier, find the best threshold from the training run
+    if not config.use_ml_classifier:
+        optimal_threshold = find_optimal_threshold(
+            train_labels, train_results["similarity_scores"]
+        )
+        # Update the detector's config with the new, optimal threshold
+        detector.config.similarity_threshold = optimal_threshold
 
     # 6. 测试阶段
     print("\n=== Testing Phase ===")
@@ -1607,31 +1633,31 @@ async def run_comparison_experiment(
     results = {}
 
     configurations = {
-        "t5-small with Allmini": DetectionConfig(
+        "t5 with Allmini": DetectionConfig(
             revision_model="t5-small",
             embedding_model="all-MiniLM-L6-v2",
             perturbation_rate=0.15,
-            use_ml_classifier=True,
+            use_ml_classifier=False,
         ),
-        "GPT-2 with allMini": DetectionConfig(
+        "GPT-2 with AllMini": DetectionConfig(
             revision_model="gpt2",
             embedding_model="all-MiniLM-L6-v2",
             perturbation_rate=0.15,
-            use_ml_classifier=True,
+            use_ml_classifier=False,
         ),
-        "gpt3.5 with paraphrase model": DetectionConfig(
-            revision_model="gpt-3.5-turbo",
-            embedding_model="paraphrase-MiniLM-L6-v2",
-            use_ml_classifier=True,
-            similarity_threshold=0.88,
-        ),
-        "gpt3.5 with funed model": DetectionConfig(
-            revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
-            embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
-            perturbation_rate=0.15,
-            use_ml_classifier=True,
-            similarity_threshold=0.705,  # 0.705,.698
-        ),
+        # "gpt3.5 with paraphrase model": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",
+        #     embedding_model="paraphrase-MiniLM-L6-v2",
+        #     use_ml_classifier=True,
+        #     similarity_threshold=0.88,
+        # ),
+        # "gpt3.5 with funed model": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
+        #     embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        #     similarity_threshold=0.705,  # 0.705,.698
+        # ),
         # "High_Perturb": DetectionConfig(
         #     revision_model="t5-small",
         #     embedding_model="all-MiniLM-L6-v2",
