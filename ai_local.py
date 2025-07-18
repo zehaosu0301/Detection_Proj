@@ -332,51 +332,54 @@ class EnhancedLLMReviser:
 
     # def revise(self, text: str, cache: Dict[str, str]) -> str:
     async def revise(
-        self, text: str, cache: Dict[str, str]
+        self, original_text: str, perturbed_text: str, cache: Dict[str, str]
     ) -> str:  # change to async def
         """
         使用LLM重写文本
 
         Args:
-            text: 待重写文本
+            original_text: 待重写文本
             cache: 缓存字典
         Returns:
             重写后的文本
         """
         # 生成缓存键
         cache_key = hashlib.md5(
-            f"{text}_{self.config.revision_model}".encode()
+            f"{original_text}_{self.config.revision_model}".encode()
         ).hexdigest()
-        # print(f"\norigin text: {text}")
+
+        # Check if the result for the original text is already in the cache
         if cache_key in cache:
             return cache[cache_key]
+
+        # print(f"\norigin text: {original_text}")
 
         try:
             model_name = self.config.revision_model
             revised = ""
             if model_name.startswith("t5") or model_name == "gpt2":
                 if model_name.startswith("t5"):
-                    revised = self._revise_with_t5(text)
+                    revised = self._revise_with_t5(perturbed_text)
                     # print(f"t5 rewrite: {revised}")
                 else:  # gpt2
-                    revised = self._revise_with_gpt2(text)
+                    revised = self._revise_with_gpt2(perturbed_text)
                     # print(f"gpt2 rewrite: {revised}")
             elif model_name.startswith("gpt-"):
                 # api rewrite
-                # revised = self._revise_with_api(text)
-                revised = await self._revise_with_api(text)  # change to await
+                # revised = self._revise_with_api(perturbed_text)
+                revised = await self._revise_with_api(perturbed_text)  # change to await
                 # print(f"gpt3.5 rewrite: {revised}")
             else:
-                revised = self._rule_based_revision(text)
+                revised = self._rule_based_revision(perturbed_text)
 
             cache[cache_key] = revised
             return revised
 
         except Exception as e:
             print(f"Revision failed with model {self.config.revision_model}: {e}")
-            revised = self._rule_based_revision(text)
-            cache[cache_key] = revised
-            return revised
+            fallback_revision = self._rule_based_revision(perturbed_text)
+            cache[cache_key] = fallback_revision
+            return fallback_revision
 
     def _revise_with_t5(self, text: str) -> str:
         """使用T5模型重写"""
@@ -761,20 +764,17 @@ class AITextDetector:
         self.cache = {}
         self.api_concurrency_limit = asyncio.Semaphore(10)
 
+    # In the AITextDetector class
+
     async def detect_batch(
         self, texts: List[str], labels: Optional[List[int]] = None
-    ) -> Dict[str, np.ndarray]:  # change to async def
+    ) -> Dict[str, np.ndarray]:
         """
-        Batch text detection
-
-        Args:
-            texts: text list
-            labels: Real labelling
-        Returns:
-            Dictionary containing prediction results and features
+        Asynchronously detects text in a batch, with robust caching and parallel API calls.
         """
         all_features = []
         all_scores = []
+
         if not texts:
             # Handle the case where an empty list is passed
             return {
@@ -784,29 +784,36 @@ class AITextDetector:
                 "similarity_scores": np.array([]),
             }
 
-        async def revise_with_limit(p_text):
-            # 在调用前获取信号量
-            async with self.api_concurrency_limit:
-                # 调用会等待，直到信号量可用
-                return await self.reviser.revise(p_text, self.cache)
-
         print("Processing texts...")
 
-        # 1. First, scramble all the text (this part is CPU intensive and can be done synchronously)
+        # Step 1: Perform synchronous, CPU-bound perturbation first.
         perturbed_texts = [
             self.perturber.perturb(text) for text in tqdm(texts, desc="Perturbing")
         ]
 
-        # 2. Create a list of all LLM rewrite tasks
-        # This part is only truly parallel if the model is an API model
+        # Step 2: Define a helper function to manage semaphore and call the new revise method.
+        # This helper will be used to create our list of concurrent tasks.
+        async def revise_with_limit(original_text, perturbed_text):
+            async with self.api_concurrency_limit:
+                # Call the updated revise function with both original and perturbed text
+                return await self.reviser.revise(
+                    original_text, perturbed_text, self.cache
+                )
+
+        # Step 3: Create a list of NEW coroutine tasks.
+        # Each task is a call to our helper function with a pair of original and perturbed texts.
         print(f"Revising texts with {self.reviser.config.revision_model}...")
-        revision_tasks = [revise_with_limit(p_text) for p_text in perturbed_texts]
+        revision_tasks = [
+            revise_with_limit(orig, pert) for orig, pert in zip(texts, perturbed_texts)
+        ]
 
-        # 3. Use asyncio.gather to perform all rewrite tasks concurrently
-        # tqdm integrates well with asyncio.gather to show progress
-        all_revised_texts = await asyncio.gather(*revision_tasks)
+        # Step 4: Concurrently run all revision tasks using asyncio.gather.
+        # This preserves the order of the results and is wrapped in tqdm for a progress bar.
+        all_revised_texts = await asyncio.gather(
+            *tqdm(revision_tasks, desc="Revising", total=len(revision_tasks))
+        )
 
-        # 4. Extract features sequentially
+        # Step 5: Process the results. This part is synchronous again.
         print("Extracting features...")
         for i, original_text in enumerate(texts):
             # The order is preserved, so we can safely pair original and revised texts.
@@ -817,31 +824,27 @@ class AITextDetector:
             all_features.append(features)
             all_scores.append(features.get("semantic_similarity", 0.5))
 
-        # 转换为特征矩阵
+        # --- The rest of the function remains the same ---
         feature_matrix = pd.DataFrame(all_features).fillna(0).values
 
-        # 如果使用ML分类器
         if self.config.use_ml_classifier:
             if labels is not None and self.classifier is None:
-                # 训练分类器
                 self._train_classifier(feature_matrix, labels)
 
             if self.classifier is not None:
-                # 标准化特征
                 feature_matrix_scaled = self.scaler.transform(feature_matrix)
-                # 预测
                 predictions = self.classifier.predict(feature_matrix_scaled)
                 probabilities = self.classifier.predict_proba(feature_matrix_scaled)[
                     :, 1
                 ]
             else:
-                # 使用阈值方法
+                # Fallback if classifier isn't trained
                 predictions = (
                     np.array(all_scores) > self.config.similarity_threshold
                 ).astype(int)
                 probabilities = np.array(all_scores)
         else:
-            # 仅使用阈值
+            # Logic for when the ML classifier is turned off
             predictions = (
                 np.array(all_scores) > self.config.similarity_threshold
             ).astype(int)
@@ -1633,31 +1636,66 @@ async def run_comparison_experiment(
     results = {}
 
     configurations = {
-        "t5 with Allmini": DetectionConfig(
-            revision_model="t5-small",
-            embedding_model="all-MiniLM-L6-v2",
-            perturbation_rate=0.15,
-            use_ml_classifier=False,
-        ),
-        "GPT-2 with AllMini": DetectionConfig(
-            revision_model="gpt2",
-            embedding_model="all-MiniLM-L6-v2",
-            perturbation_rate=0.15,
-            use_ml_classifier=False,
-        ),
-        # "gpt3.5 with paraphrase model": DetectionConfig(
-        #     revision_model="gpt-3.5-turbo",
-        #     embedding_model="paraphrase-MiniLM-L6-v2",
-        #     use_ml_classifier=True,
-        #     similarity_threshold=0.88,
+        # "t5 with Allmini&perturbation": DetectionConfig(
+        #     revision_model="t5-small",
+        #     embedding_model="all-MiniLM-L6-v2",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=False,
         # ),
-        # "gpt3.5 with funed model": DetectionConfig(
-        #     revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
-        #     embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+        # "GPT-2 with AllMini&perturbation": DetectionConfig(
+        #     revision_model="gpt2",
+        #     embedding_model="all-MiniLM-L6-v2",
+        #     perturbation_rate=0,
+        #     use_ml_classifier=False,
+        # ),
+        # "t5 with Allmini": DetectionConfig(
+        #     revision_model="t5-small",
+        #     embedding_model="all-MiniLM-L6-v2",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=False,
+        # ),
+        # "GPT-2 with AllMini": DetectionConfig(
+        #     revision_model="gpt2",
+        #     embedding_model="all-MiniLM-L6-v2",
+        #     perturbation_rate=0,
+        #     use_ml_classifier=False,
+        # ),
+        # "t5 with Allmini&feature&perturbation": DetectionConfig(
+        #     revision_model="t5-small",
+        #     embedding_model="all-MiniLM-L6-v2",
         #     perturbation_rate=0.15,
         #     use_ml_classifier=True,
-        #     similarity_threshold=0.705,  # 0.705,.698
         # ),
+        # "GPT-2 with AllMini&feature&perturbation": DetectionConfig(
+        #     revision_model="gpt2",
+        #     embedding_model="all-MiniLM-L6-v2",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
+        "gpt3.5 with Bert model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="bert-base-uncased",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        "gpt3.5 with RoBEATa model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="roberta-base",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        "gpt3.5 with paraphrase model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="paraphrase-MiniLM-L6-v2",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        "gpt3.5 with funed model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
+            embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
         # "High_Perturb": DetectionConfig(
         #     revision_model="t5-small",
         #     embedding_model="all-MiniLM-L6-v2",
@@ -1673,7 +1711,10 @@ async def run_comparison_experiment(
         print(f"\n{'='*20} Running: {name} {'='*20}")
         try:
             results[name] = await main(
-                data_path, max_samples, use_cache=True, config=config
+                data_path=data_path,
+                max_samples=max_samples,
+                use_cache=True,
+                config=config,
             )
         except Exception as e:
             print(f"!!!!!! Experiment '{name}' failed: {e} !!!!!!")
@@ -1713,7 +1754,7 @@ if __name__ == "__main__":
     if mode == "compare":
         # 运行对比实验
         print("Running comparison experiment...")
-        asyncio.run(run_comparison_experiment(data_path="test", max_samples=500))
+        asyncio.run(run_comparison_experiment(data_path="test", max_samples=None))
 
     elif mode == "quick":
         # 快速测试
