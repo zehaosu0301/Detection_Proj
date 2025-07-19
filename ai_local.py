@@ -41,6 +41,7 @@ from sklearn.metrics import (
     confusion_matrix,
     roc_curve,
     precision_recall_curve,
+    f1_score,
 )
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
@@ -570,6 +571,15 @@ class MultiFeatureExtractor:
     def __init__(self, config: DetectionConfig):
         self.config = config
         self.sentence_model = SentenceTransformer(config.embedding_model)
+
+        if self.sentence_model.tokenizer.pad_token is None:
+            print(
+                f"Warning: Tokenizer for '{config.embedding_model}' is missing a pad token. Setting it to eos_token."
+            )
+            self.sentence_model.tokenizer.pad_token = (
+                self.sentence_model.tokenizer.eos_token
+            )
+
         self._init_linguistic_features()
 
     def _init_linguistic_features(self):
@@ -1547,11 +1557,12 @@ async def main(
     # 计算指标
     accuracy = accuracy_score(test_labels, test_predictions)
     auc = roc_auc_score(test_labels, test_probabilities)
+    f1 = f1_score(test_labels, test_predictions)
 
     print(f"\n=== Test Results ===")
     print(f"Accuracy: {accuracy:.4f}")
     print(f"AUC: {auc:.4f}")
-
+    print(f"F1 Scores: {f1:.4f}")
     # 详细报告
     print("\nClassification Report:")
     print(
@@ -1621,6 +1632,7 @@ async def main(
         "test_labels": test_labels,
         "accuracy": accuracy,
         "auc": auc,
+        "f1": f1,
     }
 
 
@@ -1672,18 +1684,30 @@ async def run_comparison_experiment(
         #     perturbation_rate=0.15,
         #     use_ml_classifier=True,
         # ),
-        "gpt3.5 with Bert model": DetectionConfig(
-            revision_model="gpt-3.5-turbo",
-            embedding_model="bert-base-uncased",
-            perturbation_rate=0.15,
-            use_ml_classifier=True,
-        ),
-        "gpt3.5 with RoBEATa model": DetectionConfig(
-            revision_model="gpt-3.5-turbo",
-            embedding_model="roberta-base",
-            perturbation_rate=0.15,
-            use_ml_classifier=True,
-        ),
+        # "gpt3.5 with Bert model": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",
+        #     embedding_model="bert-base-uncased",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
+        # "gpt3.5 with gpt2": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",
+        #     embedding_model="gpt2",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
+        # "gpt3.5 with T5": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",
+        #     embedding_model="t5-small",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
+        # "gpt3.5 with RoBEATa model": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",
+        #     embedding_model="roberta-base",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
         "gpt3.5 with paraphrase model": DetectionConfig(
             revision_model="gpt-3.5-turbo",
             embedding_model="paraphrase-MiniLM-L6-v2",
@@ -1721,11 +1745,11 @@ async def run_comparison_experiment(
 
     # Compare results textually
     print("\n\n=== Final Comparison Summary ===")
-    print(f"{'Configuration':<20} {'Accuracy':<10} {'AUC':<10}")
+    print(f"{'Configuration':<30} {'Accuracy':<10} {'AUC':<10} {'F1-Score':<10}")
     print("-" * 40)
     for name, result_data in results.items():
         print(
-            f"{name:<20} {result_data['accuracy']:<10.4f} {result_data['auc']:<10.4f}"
+            f"{name:<20} {result_data['accuracy']:<10.4f} {result_data['auc']:<10.4f}{result_data['f1']:<10.4f}"
         )
 
     # Visualize results
