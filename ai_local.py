@@ -579,7 +579,16 @@ class MultiFeatureExtractor:
             self.sentence_model.tokenizer.pad_token = (
                 self.sentence_model.tokenizer.eos_token
             )
+        # --- Add these lines to view parameters ---
+        print(f"\n--- Parameters for Embedding Model: {config.embedding_model} ---")
+        # Print the model architecture (all layers)
+        print(self.sentence_model)
 
+        # Calculate and print the total number of trainable parameters
+        total_params = sum(
+            p.numel() for p in self.sentence_model.parameters() if p.requires_grad
+        )
+        print(f"Total Trainable Parameters: {total_params:,}")
         self._init_linguistic_features()
 
     def _init_linguistic_features(self):
@@ -878,6 +887,9 @@ class AITextDetector:
         self.classifier = RandomForestClassifier(
             n_estimators=100, max_depth=10, random_state=42, n_jobs=-1
         )
+
+        print(f"\n--- RandomForestClassifier Parameters ---")
+        print(self.classifier.get_params())
 
         self.classifier.fit(features_scaled, labels)
 
@@ -1684,42 +1696,42 @@ async def run_comparison_experiment(
         #     perturbation_rate=0.15,
         #     use_ml_classifier=True,
         # ),
-        # "gpt3.5 with Bert model": DetectionConfig(
-        #     revision_model="gpt-3.5-turbo",
-        #     embedding_model="bert-base-uncased",
-        #     perturbation_rate=0.15,
-        #     use_ml_classifier=True,
-        # ),
-        # "gpt3.5 with gpt2": DetectionConfig(
-        #     revision_model="gpt-3.5-turbo",
-        #     embedding_model="gpt2",
-        #     perturbation_rate=0.15,
-        #     use_ml_classifier=True,
-        # ),
-        # "gpt3.5 with T5": DetectionConfig(
-        #     revision_model="gpt-3.5-turbo",
-        #     embedding_model="t5-small",
-        #     perturbation_rate=0.15,
-        #     use_ml_classifier=True,
-        # ),
-        # "gpt3.5 with RoBEATa model": DetectionConfig(
-        #     revision_model="gpt-3.5-turbo",
-        #     embedding_model="roberta-base",
-        #     perturbation_rate=0.15,
-        #     use_ml_classifier=True,
-        # ),
-        "gpt3.5 with paraphrase model": DetectionConfig(
+        "gpt3.5 with Bert model": DetectionConfig(
             revision_model="gpt-3.5-turbo",
-            embedding_model="paraphrase-MiniLM-L6-v2",
+            embedding_model="bert-base-uncased",
             perturbation_rate=0.15,
             use_ml_classifier=True,
         ),
-        "gpt3.5 with funed model": DetectionConfig(
-            revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
-            embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+        "gpt3.5 with gpt2": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="gpt2",
             perturbation_rate=0.15,
             use_ml_classifier=True,
         ),
+        "gpt3.5 with T5": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="t5-small",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        "gpt3.5 with RoBEATa model": DetectionConfig(
+            revision_model="gpt-3.5-turbo",
+            embedding_model="roberta-base",
+            perturbation_rate=0.15,
+            use_ml_classifier=True,
+        ),
+        # "gpt3.5 with paraphrase model": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",
+        #     embedding_model="paraphrase-MiniLM-L6-v2",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
+        # "gpt3.5 with funed model": DetectionConfig(
+        #     revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
+        #     embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+        #     perturbation_rate=0.15,
+        #     use_ml_classifier=True,
+        # ),
         # "High_Perturb": DetectionConfig(
         #     revision_model="t5-small",
         #     embedding_model="all-MiniLM-L6-v2",
