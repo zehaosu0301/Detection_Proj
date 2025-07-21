@@ -1857,7 +1857,7 @@ async def run_dtdf_dsff_experiment(
     # 3. Initialize detector
     config = DetectionConfig(
         revision_model="gpt-3.5-turbo",  # Will fall back to rule-based if no API key
-        embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
+        embedding_model="distilbert-base-uncased",
         perturbation_rate=0.15,
         use_ml_classifier=True,
     )
