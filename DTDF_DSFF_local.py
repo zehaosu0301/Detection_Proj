@@ -1857,7 +1857,7 @@ async def run_dtdf_dsff_experiment(
     # 3. Initialize detector
     config = DetectionConfig(
         revision_model="gpt-3.5-turbo",  # Will fall back to rule-based if no API key
-        embedding_model="distilbert-base-uncased",
+        embedding_model="./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete",
         perturbation_rate=0.15,
         use_ml_classifier=True,
     )
@@ -2121,11 +2121,10 @@ async def run_comparison_experiment(
 
 if __name__ == "__main__":
 
-    # Example 2: Run comparison experiment
     print("\nRunning comparison experiment...")
     dtdf_results = asyncio.run(
         run_dtdf_dsff_experiment(
-            data_path="test", max_samples=2000, num_epochs=5, batch_size=16
+            data_path="test", max_samples=None, num_epochs=5, batch_size=16
         )
     )
 
