@@ -1,16 +1,4 @@
-"""
-Enhanced AI Text Detection Pipeline
------------------------------------
-核心改进:
-1. 更好的LLM选择（T5/GPT-2用于重写）
-2. 多维度特征提取
-3. 更智能的扰动策略
-4. 集成学习方法
-
-
-"""
-
-# 尝试导入，如果失败则提示安装
+# Try to import, if it fails prompt to install
 from __future__ import annotations
 import os
 import json
@@ -33,7 +21,7 @@ from openai import OpenAI
 from openai import AsyncOpenAI
 import tiktoken
 
-# 基础库
+# Basic libraries
 from sklearn.metrics import (
     roc_auc_score,
     accuracy_score,
@@ -47,7 +35,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 import torch
 
-# 可视化库
+# Visualisation libraries
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -70,12 +58,12 @@ from transformers import (
 )
 from sentence_transformers import SentenceTransformer
 
-# 文本处理
+# Text processing
 import nltk
 from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 
-# 文本扰动库
+# Text Scrambler Library
 try:
     import nlpaug.augmenter.word as naw
     import nlpaug.augmenter.sentence as nas
@@ -85,7 +73,7 @@ except ImportError:
     import nlpaug.augmenter.word as naw
     import nlpaug.augmenter.sentence as nas
 
-# Transformers 和 sentence-transformers
+# Transformers and sentence-transformers
 
 from transformers import (
     pipeline,
@@ -98,7 +86,7 @@ from sentence_transformers import SentenceTransformer
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-# NLTK数据下载
+# NLTK data download
 import nltk
 
 print("Downloading required NLTK data...")
@@ -112,7 +100,7 @@ nltk.download("stopwords", quiet=True)
 print("NLTK data download completed.")
 import logging
 
-# 配置日志
+# Configuration log
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
@@ -121,9 +109,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DetectionConfig:
-    """检测配置类"""
+    """Detecting Configuration Classes"""
 
-    # 模型选择
     revision_model: str = "t5-small"
     embedding_model: str = "all-MiniLM-L6-v2"
 
@@ -132,18 +119,15 @@ class DetectionConfig:
         default_factory=lambda: os.getenv("OPENAI_BASE_URL")
     )
 
-    # 扰动参数
     perturbation_rate: float = 0.15
-    # 【修正】使用field(default_factory=...)来避免可变默认参数问题
+
     perturbation_methods: List[str] = field(
         default_factory=lambda: ["synonym", "contextual"]
     )
 
-    # 检测参数
-    similarity_threshold: float = 0.95  # 建议使用0.85作为更稳健的默认值
+    similarity_threshold: float = 0.95
     use_ml_classifier: bool = True
 
-    # 批处理
     batch_size: int = 16
     max_length: int = 512
 
@@ -153,14 +137,13 @@ class DetectionConfig:
 
 
 class EnhancedTextPerturber:
-    """增强的文本扰动器"""
 
     def __init__(self, config: DetectionConfig):
         self.config = config
         self._init_augmenters()
 
     def _init_augmenters(self):
-        """初始化各种扰动器"""
+
         self.augmenters = {
             "synonym": naw.SynonymAug(
                 aug_src="wordnet", aug_p=self.config.perturbation_rate
@@ -178,13 +161,13 @@ class EnhancedTextPerturber:
 
     def perturb(self, text: str, method: Optional[str] = None) -> str:
         """
-        智能扰动策略
+        Intelligent Perturbation Strategies
 
-        Args:
-            text: 原始文本
-            method: 指定方法，None则随机选择
-        Returns:
-            扰动后的文本
+        Args.
+            text: original text
+            method: specified method, None is chosen randomly
+        Returns.
+            Scrambled text
         """
         if method is None:
             method = np.random.choice(self.config.perturbation_methods)
@@ -196,19 +179,19 @@ class EnhancedTextPerturber:
                 augmented = self.augmenters[method].augment(text)
                 return augmented[0] if isinstance(augmented, list) else augmented
             else:
-                # 混合扰动
+
                 return self._mixed_perturbation(text)
         except Exception as e:
             print(f"Perturbation failed: {e}")
             return self._simple_perturb(text)
 
     def _mixed_perturbation(self, text: str) -> str:
-        """混合多种扰动方法"""
+
         sentences = sent_tokenize(text)
         perturbed_sentences = []
 
         for sent in sentences:
-            # 随机选择扰动方法
+
             method = np.random.choice(list(self.augmenters.keys()))
             try:
                 perturbed = self.augmenters[method].augment(sent)
@@ -222,17 +205,16 @@ class EnhancedTextPerturber:
         return " ".join(perturbed_sentences)
 
     def _simple_perturb(self, text: str) -> str:
-        """简单扰动作为后备"""
+
         words = text.split()
 
-        # 随机替换15%的词
         num_changes = max(1, int(len(words) * self.config.perturbation_rate))
         indices = np.random.choice(
             range(len(words)), size=min(num_changes, len(words)), replace=False
         )
 
         for idx in indices:
-            # 简单的字符级修改
+
             word = words[idx]
             if len(word) > 3:
                 words[idx] = word[:-1] + np.random.choice(list("aeiou"))
@@ -240,13 +222,12 @@ class EnhancedTextPerturber:
         return " ".join(words)
 
     def _backtranslate(self, text: str) -> str:
-        """反向翻译（需要翻译API）"""
-        # 这里只是示例，实际需要调用翻译API
+
         return text
 
 
 class EnhancedLLMReviser:
-    """增强的LLM重写器"""
+    """Enhanced LLM Rewriter"""
 
     def __init__(self, config: DetectionConfig):
         self.config = config
@@ -258,24 +239,24 @@ class EnhancedLLMReviser:
 
     def _init_model(self):
         model_name = self.config.revision_model
-        """初始化重写模型"""
+        """Initialising the rewrite model"""
         if self.config.revision_model.startswith("t5"):
-            # T5模型更适合文本重写任务
+
             self.tokenizer = T5Tokenizer.from_pretrained(self.config.revision_model)
             self.model = T5ForConditionalGeneration.from_pretrained(
                 self.config.revision_model
             )
         elif self.config.revision_model == "gpt2":
-            # GPT-2作为备选
+            # GPT-2 as an option
             self.tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
             self.model = GPT2LMHeadModel.from_pretrained("gpt2")
             self.tokenizer.pad_token = self.tokenizer.eos_token
         elif model_name.startswith("gpt-"):
-            # 初始化OpenAI API客户端
+            # Initialising the OpenAI API client
             api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError(
-                    "请在DetectionConfig中提供api_key或设置OPENAI_API_KEY环境变量"
+                    "Please provide api_key in DetectionConfig or set the OPENAI_API_KEY environment variable."
                 )
 
             self.client = OpenAI(api_key=api_key, base_url=self.config.base_url)
@@ -293,7 +274,7 @@ class EnhancedLLMReviser:
         self.model.eval()
 
     def _init_reviser(self):
-        """根据配置初始化重写模型或API客户端"""
+        """Initialise rewrite model or API client according to configuration"""
         model_name = self.config.revision_model
 
         if model_name.startswith("t5"):
@@ -310,11 +291,11 @@ class EnhancedLLMReviser:
             print(f"Local GPT-2 model loaded: {model_name}")
 
         elif model_name.startswith("gpt-"):
-            # 初始化OpenAI API客户端
+            # Initialising the OpenAI API client
             api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError(
-                    "请在DetectionConfig中提供api_key或设置OPENAI_API_KEY环境变量"
+                    "Please provide api_key in DetectionConfig or set the OPENAI_API_KEY environment variable."
                 )
 
             # self.client = OpenAI(api_key=api_key, base_url=self.config.base_url)
@@ -336,13 +317,13 @@ class EnhancedLLMReviser:
         self, original_text: str, perturbed_text: str, cache: Dict[str, str]
     ) -> str:  # change to async def
         """
-        使用LLM重写文本
+        Rewriting Text with LLM
 
-        Args:
-            original_text: 待重写文本
-            cache: 缓存字典
-        Returns:
-            重写后的文本
+        Args.
+            original_text: text to be rewritten
+            cache: Cached dictionary
+        Returns.
+            Rewritten text
         """
         # 生成缓存键
         cache_key = hashlib.md5(
@@ -383,38 +364,33 @@ class EnhancedLLMReviser:
             return fallback_revision
 
     def _revise_with_t5(self, text: str) -> str:
-        """使用T5模型重写"""
-        # T5需要特定的提示格式
+        """Rewrite using the T5 model"""
+
         prompt = f"paraphrase: {text}"
 
         inputs = self.tokenizer.encode(
             prompt,
             return_tensors="pt",
-            max_length=512,  # 对输入进行截断的最大长度
+            max_length=512,  # Maximum length of input truncation
             truncation=True,
         ).to(self.device)
 
         with torch.no_grad():
-            # 使用束搜索 (Beam Search) 以获得更高质量和更稳定的输出
+
             outputs = self.model.generate(
                 inputs,
-                # --- 解码策略修改 ---
-                num_beams=4,  # 修改：设置束的宽度，4或5是常用值
-                early_stopping=True,  # 新增：当所有束都完成时提前停止
-                # --- 长度控制优化 ---
-                max_length=256,  # 修改：为输出设置一个固定的最大长度
-                min_length=40,  # 新增：设置一个合理的最小长度，防止输出过短
-                # --- 质量优化 ---
-                repetition_penalty=1.2,  # 新增：轻微惩罚重复，提升多样性
+                num_beams=4,
+                early_stopping=True,
+                max_length=256,
+                min_length=40,
+                repetition_penalty=1.2,
             )
-
-            # 注意：使用 beam search 时，不需要 do_sample, temperature, top_p
 
         revised = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         return revised
 
     def _revise_with_gpt2(self, text: str) -> str:
-        """使用GPT-2模型重写"""
+        """Rewrite using the GPT-2 model"""
         try:
             prompt_templates = [
                 f"Paraphrase the following text while keeping the same meaning: {text}\n\nParaphrased version:",
@@ -471,7 +447,7 @@ class EnhancedLLMReviser:
             return rewritten if rewritten else text
 
         except Exception as e:
-            print(f"  修复版重写失败: {e}")
+            print(f"  Fixed Rewrite Failure: {e}")
             return text
 
     # def _revise_with_api(self, text: str) -> str:
@@ -520,19 +496,17 @@ The more casual or informal the original text, the more changes you should make.
         return text
 
     def _rule_based_revision(self, text: str) -> str:
-        """基于规则的重写"""
+
         import re
 
-        # 句子重排
         sentences = sent_tokenize(text)
         if len(sentences) > 2:
-            # 随机调整句子顺序（保持逻辑性）
+
             sentences = self._reorder_sentences(sentences)
 
-        # 同义词替换
         revised_sentences = []
         for sent in sentences:
-            # 简单的同义词映射
+
             synonyms = {
                 "important": "significant",
                 "however": "nevertheless",
@@ -550,8 +524,8 @@ The more casual or informal the original text, the more changes you should make.
         return " ".join(revised_sentences)
 
     def _reorder_sentences(self, sentences: List[str]) -> List[str]:
-        """智能句子重排"""
-        # 保持第一句和最后一句
+        """Intelligent Sentence Rearrangement"""
+        # Keep the first and last sentences
         if len(sentences) <= 2:
             return sentences
 
@@ -559,14 +533,14 @@ The more casual or informal the original text, the more changes you should make.
         last = sentences[-1]
         middle = sentences[1:-1]
 
-        # 打乱中间句子
+        # break up the middle of a sentence
         np.random.shuffle(middle)
 
         return [first] + middle + [last]
 
 
 class MultiFeatureExtractor:
-    """多维度特征提取器"""
+    """Multi-dimensional feature extractor"""
 
     def __init__(self, config: DetectionConfig):
         self.config = config
@@ -592,7 +566,7 @@ class MultiFeatureExtractor:
         self._init_linguistic_features()
 
     def _init_linguistic_features(self):
-        """初始化语言学特征提取"""
+        """Initialised Linguistic Feature Extraction"""
         try:
             nltk.download("punkt", quiet=True)
             nltk.download("averaged_perceptron_tagger", quiet=True)
@@ -603,34 +577,34 @@ class MultiFeatureExtractor:
 
     def extract_features(self, original: str, revised: str) -> Dict[str, float]:
         """
-        提取多维度特征
+        Extract multi-dimensional features
 
         Returns:
-            特征字典
+            feature dictionary
         """
         features = {}
 
-        # 1. 语义相似度
+        # 1. semantic similarity
         features["semantic_similarity"] = self._compute_semantic_similarity(
             original, revised
         )
 
-        # 2. 词汇级特征
+        # 2. lexical level feature
         features.update(self._extract_lexical_features(original, revised))
 
-        # 3. 句法特征
+        # 3. Syntactic features
         features.update(self._extract_syntactic_features(original, revised))
 
-        # 4. 风格特征
+        # 4. style
         features.update(self._extract_stylistic_features(original, revised))
 
-        # 5. 编辑距离特征
+        # 5. Edit Distance Characteristics
         features.update(self._extract_edit_features(original, revised))
 
         return features
 
     def _compute_semantic_similarity(self, text1: str, text2: str) -> float:
-        """计算语义相似度"""
+        """Calculating semantic similarity"""
         emb1 = self.sentence_model.encode(text1)
         emb2 = self.sentence_model.encode(text2)
 
@@ -641,11 +615,11 @@ class MultiFeatureExtractor:
     def _extract_lexical_features(
         self, original: str, revised: str
     ) -> Dict[str, float]:
-        """提取词汇级特征"""
+        """Extraction of vocabulary-level features"""
         orig_words = set(word_tokenize(original.lower()))
         rev_words = set(word_tokenize(revised.lower()))
 
-        # 词汇重叠率
+        # overlap rate of vocabulary
         overlap = len(orig_words & rev_words)
         total = len(orig_words | rev_words)
 
@@ -659,7 +633,7 @@ class MultiFeatureExtractor:
             ),
         }
 
-        # 停用词比例变化
+        # Change in proportion of deactivated words
         orig_stop = len([w for w in orig_words if w in self.stop_words])
         rev_stop = len([w for w in rev_words if w in self.stop_words])
 
@@ -673,7 +647,7 @@ class MultiFeatureExtractor:
     def _extract_syntactic_features(
         self, original: str, revised: str
     ) -> Dict[str, float]:
-        """提取句法特征"""
+        """Extracting syntactic features"""
         orig_sents = sent_tokenize(original)
         rev_sents = sent_tokenize(revised)
 
@@ -691,13 +665,17 @@ class MultiFeatureExtractor:
             ),
         }
 
-        # POS标签分布变化
         try:
             orig_pos = nltk.pos_tag(word_tokenize(original))
             rev_pos = nltk.pos_tag(word_tokenize(revised))
 
-            # 计算主要词性比例变化
-            for pos_type in ["NN", "VB", "JJ", "RB"]:  # 名词、动词、形容词、副词
+            # Calculate the percentage change in the main lexical categories
+            for pos_type in [
+                "NN",
+                "VB",
+                "JJ",
+                "RB",
+            ]:  # Nouns, verbs, adjectives, adverbs
                 orig_count = sum(1 for _, pos in orig_pos if pos.startswith(pos_type))
                 rev_count = sum(1 for _, pos in rev_pos if pos.startswith(pos_type))
 
@@ -713,10 +691,10 @@ class MultiFeatureExtractor:
     def _extract_stylistic_features(
         self, original: str, revised: str
     ) -> Dict[str, float]:
-        """提取风格特征"""
+        """Extracting stylistic features"""
         features = {}
 
-        # 标点符号使用变化
+        # Changes in the use of punctuation
         orig_punct = sum(1 for c in original if c in ".,!?;:")
         rev_punct = sum(1 for c in revised if c in ".,!?;:")
 
@@ -725,7 +703,7 @@ class MultiFeatureExtractor:
             - (rev_punct / len(revised) if revised else 0)
         )
 
-        # 大写字母比例变化
+        # Change in proportion of capital letters
         orig_caps = sum(1 for c in original if c.isupper())
         rev_caps = sum(1 for c in revised if c.isupper())
 
@@ -734,7 +712,7 @@ class MultiFeatureExtractor:
             - (rev_caps / len(revised) if revised else 0)
         )
 
-        # 平均词长变化
+        # Change in average word length
         orig_words = word_tokenize(original)
         rev_words = word_tokenize(revised)
 
@@ -750,13 +728,13 @@ class MultiFeatureExtractor:
         return features
 
     def _extract_edit_features(self, original: str, revised: str) -> Dict[str, float]:
-        """提取编辑距离相关特征"""
+        """Extraction of edit distance related features"""
         from difflib import SequenceMatcher
 
-        # 字符级相似度
+        # Character-level similarity
         char_similarity = SequenceMatcher(None, original, revised).ratio()
 
-        # 词级相似度
+        # word-level similarity
         orig_words = word_tokenize(original)
         rev_words = word_tokenize(revised)
         word_similarity = SequenceMatcher(None, orig_words, rev_words).ratio()
@@ -771,7 +749,7 @@ class MultiFeatureExtractor:
 
 
 class AITextDetector:
-    """主检测器类"""
+    """Main detector class"""
 
     def __init__(self, config: DetectionConfig = None):
         self.config = config or DetectionConfig()
@@ -877,13 +855,13 @@ class AITextDetector:
         }
 
     def _train_classifier(self, features: np.ndarray, labels: List[int]):
-        """训练机器学习分类器"""
+        """Training Machine Learning Classifiers"""
         print("Training classifier...")
 
-        # 标准化特征
+        # Standardised features
         features_scaled = self.scaler.fit_transform(features)
 
-        # 使用随机森林
+        # Using Random Forests
         self.classifier = RandomForestClassifier(
             n_estimators=100, max_depth=10, random_state=42, n_jobs=-1
         )
@@ -893,7 +871,7 @@ class AITextDetector:
 
         self.classifier.fit(features_scaled, labels)
 
-        # 特征重要性
+        # Characteristic importance
         feature_names = list(pd.DataFrame(features).columns)
         importances = self.classifier.feature_importances_
 
@@ -904,7 +882,7 @@ class AITextDetector:
             print(f"  {feat}: {imp:.4f}")
 
     def save_model(self, path: str):
-        """保存模型"""
+        """Save the model"""
         import pickle
 
         model_data = {
@@ -920,7 +898,7 @@ class AITextDetector:
         print(f"Model saved to {path}")
 
     def load_model(self, path: str):
-        """加载模型"""
+        """Loading Models"""
         import pickle
 
         with open(path, "rb") as f:
@@ -934,17 +912,10 @@ class AITextDetector:
         print(f"Model loaded from {path}")
 
 
-# 数据集加载函数
 class DataLoader:
-    """数据加载器类"""
+    """Data Loader Class"""
 
     def __init__(self, data_dir: str = "./data"):
-        """
-        初始化数据加载器
-
-        Args:
-            data_dir: 数据文件默认目录
-        """
         self.data_dir = data_dir
         if not os.path.exists(data_dir):
             os.makedirs(data_dir)
@@ -952,12 +923,11 @@ class DataLoader:
 
     def load_data(self, path: str) -> pd.DataFrame:
         """
-        读取带有 'text' 与 'label' 列的数据集，并返回 DataFrame。
-        支持金融数据集格式和通用格式。
+        Reads a dataset with 'text' and 'label' columns and returns a DataFrame.
 
-        Args:
-            path: 数据文件路径、'finance' 表示使用金融数据集、'sample' 表示创建示例数据
-        Returns:
+        Args.
+            path: path to the data file, 'finance' means use financial dataset, 'sample' means create sample data.
+        Returns.
             df: columns = ['id', 'text', 'label']
         """
         if path == "finance":
@@ -967,7 +937,7 @@ class DataLoader:
         elif path == "test":
             return self.load_origin_dataset()
 
-        # 如果是相对路径，添加数据目录前缀
+        # If it is a relative path, add a data catalogue prefix
         if not os.path.isabs(path) and not os.path.exists(path):
             path = os.path.join(self.data_dir, path)
 
@@ -981,19 +951,19 @@ class DataLoader:
             else:
                 raise ValueError(f"Unsupported file format: {path}")
 
-            # 确保有必要的列
+            # Ensure that the necessary columns are available
             if "text" not in df.columns:
                 raise ValueError("Missing 'text' column in dataset")
             if "label" not in df.columns:
                 raise ValueError("Missing 'label' column in dataset")
 
-            # 如果没有id列，自动生成
+            # If there is no id column, automatically generate
             if "id" not in df.columns:
                 df["id"] = range(len(df))
 
-            # 数据清洗
+            # Data Cleaning
             df = df.dropna(subset=["text", "label"])
-            df = df[df["text"].str.len() > 10]  # 过滤太短的文本
+            df = df[df["text"].str.len() > 10]  # Filtering text that is too short
 
             logger.info(f"Loaded {len(df)} samples from {path}")
             logger.info(f"Label distribution: {df['label'].value_counts().to_dict()}")
@@ -1005,10 +975,10 @@ class DataLoader:
             return self.create_sample_dataset()
 
     def find_finance_data_files(self) -> Dict[str, str]:
-        """查找金融数据集文件"""
+        """Find financial dataset files"""
         logger.info("Searching for finance data files...")
 
-        # 本地环境路径
+        # Local environment path
         possible_paths = [
             self.data_dir,
             os.path.join(self.data_dir, "finance"),
@@ -1039,12 +1009,11 @@ class DataLoader:
 
     def load_finance_dataset(self) -> pd.DataFrame:
         """
-        加载金融数据集 - 使用修订后的文本作为数据
-        修复了多行JSON解析问题
+        Load financial dataset - use revised text as data
 
-        Returns:
+        Returns.
             df: columns = ['id', 'text', 'label']
-            其中text是修订后的文本，label: 0=human, 1=chatgpt
+            where text is the revised text, label: 0=human, 1=chatgpt
         """
         files = self.find_finance_data_files()
 
@@ -1054,7 +1023,6 @@ class DataLoader:
         all_texts = []
         all_labels = []
 
-        # 1. 加载修订后的人类文本（每行一个JSON对象）
         if "revised_human" in files:
             try:
                 logger.info(
@@ -1065,10 +1033,10 @@ class DataLoader:
                         line = line.strip()
                         if line:
                             try:
-                                # 每行是一个独立的JSON对象
+
                                 item = json.loads(line)
                                 for idx, text in item.items():
-                                    # 清理文本
+
                                     cleaned_text = (
                                         text.strip()
                                         .replace("\\n\\n", " ")
@@ -1085,7 +1053,7 @@ class DataLoader:
             except Exception as e:
                 logger.error(f"Error loading revised human texts: {e}")
 
-        # 2. 加载修订后的ChatGPT文本（每行一个JSON对象）
+        # Load revised ChatGPT text (one JSON object per line)
         if "revised_chatgpt" in files:
             try:
                 logger.info(
@@ -1096,10 +1064,10 @@ class DataLoader:
                         line = line.strip()
                         if line:
                             try:
-                                # 每行是一个独立的JSON对象
+
                                 item = json.loads(line)
                                 for idx, text in item.items():
-                                    # 清理文本
+
                                     cleaned_text = (
                                         text.strip()
                                         .replace("\\n\\n", " ")
@@ -1116,12 +1084,12 @@ class DataLoader:
             except Exception as e:
                 logger.error(f"Error loading revised ChatGPT texts: {e}")
 
-        # 4. 创建DataFrame
+        # Creating a DataFrame
         df = pd.DataFrame(
             {"id": range(len(all_texts)), "text": all_texts, "label": all_labels}
         )
 
-        # 打乱数据
+        # Disrupt the data
         df = df.sample(frac=1, random_state=42).reset_index(drop=True)
         df["id"] = range(len(df))
 
@@ -1130,7 +1098,7 @@ class DataLoader:
         logger.info(f"Human texts: {len(df[df['label'] == 0])}")
         logger.info(f"ChatGPT texts: {len(df[df['label'] == 1])}")
 
-        # 显示示例
+        # Show Example
         if len(df) > 0:
             logger.info("\nSample texts:")
             for label in [0, 1]:
@@ -1144,7 +1112,7 @@ class DataLoader:
 
     def create_sample_dataset(self) -> pd.DataFrame:
         """
-        创建示例数据集用于测试
+        Create a sample dataset for testing
 
         Returns:
             df: columns = ['id', 'text', 'label']
@@ -1277,12 +1245,12 @@ class DataLoader:
 
     def save_dataset(self, df: pd.DataFrame, filename: str, format: str = "csv"):
         """
-        保存数据集到文件
+        Saving a dataset to a file
 
         Args:
-            df: 要保存的DataFrame
-            filename: 文件名（不含扩展名）
-            format: 文件格式 ('csv', 'json', 'jsonl')
+            df: the DataFrame to be saved
+            filename: the name of the file (without extension)
+            format: file format ('csv', 'json', 'jsonl')
         """
         filepath = os.path.join(self.data_dir, f"{filename}.{format}")
 
@@ -1326,14 +1294,13 @@ def evaluate_detector(
     detector: AITextDetector, texts: List[str], labels: List[int]
 ) -> Dict[str, float]:
     """
-    评估检测器性能
+    Evaluating detector performance
     """
     results = detector.detect_batch(texts, labels)
 
     predictions = results["predictions"]
     probabilities = results["probabilities"]
 
-    # 计算指标
     metrics = {
         "accuracy": accuracy_score(labels, predictions),
         "auc": roc_auc_score(labels, probabilities),
@@ -1346,7 +1313,6 @@ def evaluate_detector(
     print("\nClassification Report:")
     print(classification_report(labels, predictions, target_names=["Human", "AI"]))
 
-    # 分析相似度分布
     human_scores = results["similarity_scores"][np.array(labels) == 0]
     ai_scores = results["similarity_scores"][np.array(labels) == 1]
 
@@ -1359,11 +1325,8 @@ def evaluate_detector(
     return metrics
 
 
-# ==============================================================================
-
-
 def plot_roc_curves(results: Dict):
-    """绘制所有实验的ROC曲线"""
+
     plt.figure(figsize=(10, 8))
     for name, result_data in results.items():
         fpr, tpr, _ = roc_curve(
@@ -1383,7 +1346,7 @@ def plot_roc_curves(results: Dict):
 
 
 def plot_precision_recall_curves(results: Dict):
-    """绘制所有实验的Precision-Recall曲线"""
+
     plt.figure(figsize=(10, 8))
     for name, result_data in results.items():
         precision, recall, _ = precision_recall_curve(
@@ -1399,7 +1362,7 @@ def plot_precision_recall_curves(results: Dict):
 
 
 def plot_confusion_matrices(results: Dict):
-    """绘制所有实验的混淆矩阵"""
+
     n_results = len(results)
     fig, axes = plt.subplots(1, n_results, figsize=(6 * n_results, 5))
     if n_results == 1:
@@ -1426,7 +1389,7 @@ def plot_confusion_matrices(results: Dict):
 
 
 def plot_classification_metrics(results: Dict):
-    """将关键分类指标（P, R, F1）绘制成条形图进行比较"""
+
     metrics_data = []
     for name, result_data in results.items():
         report = classification_report(
@@ -1435,7 +1398,6 @@ def plot_classification_metrics(results: Dict):
             target_names=["Human", "AI"],
             output_dict=True,
         )
-        # 只关注AI类别的指标
         ai_metrics = report["AI"]
         metrics_data.append(
             {
@@ -1485,15 +1447,6 @@ async def main(
     use_cache: bool = True,
     config: Optional[DetectionConfig] = None,
 ):
-    """
-    主执行函数 - 使用增强版检测器
-
-    Args:
-        data_path: 数据文件路径或 'finance'/'sample'
-        max_samples: 限制处理的样本数量（用于快速测试）
-        use_cache: 是否使用缓存
-        config: 检测器配置
-    """
 
     SEED = 42
     random.seed(SEED)
@@ -1507,7 +1460,6 @@ async def main(
         f"Method: Multi-feature extraction with {config.revision_model if config else 'default model'}"
     )
 
-    # 1. 加载数据
     logger.info(f"Loading data from: {data_path}")
     loader = DataLoader()
     df = loader.load_data(data_path)
@@ -1519,14 +1471,14 @@ async def main(
     texts = df["text"].tolist()
     labels = df["label"].tolist()
 
-    # 2. 数据分割（70% 训练，30% 测试）
+    # Data segmentation
     split_idx = int(len(texts) * 0.6)
     train_texts, test_texts = texts[:split_idx], texts[split_idx:]
     train_labels, test_labels = labels[:split_idx], labels[split_idx:]
 
     print(f"\nDataset split: {len(train_texts)} training, {len(test_texts)} testing")
 
-    # 3. 创建检测器
+    # Creating Detectors
     if config is None:
         config = DetectionConfig(
             revision_model="t5-small",  # 或 "gpt2" t5-small
@@ -1537,14 +1489,14 @@ async def main(
 
     detector = AITextDetector(config)
 
-    # 4. 加载缓存
+    # Load Cache
     cache_path = f"enhanced_cache_{config.revision_model}.json"
     if use_cache and os.path.exists(cache_path):
         with open(cache_path, "r") as f:
             detector.cache = json.load(f)
         print(f"Loaded cache with {len(detector.cache)} entries")
 
-    # 5. 训练阶段
+    # training phase
     print("\n=== Training Phase ===")
     print(
         "Train labels distribution:", pd.Series(train_labels).value_counts().to_dict()
@@ -1558,15 +1510,15 @@ async def main(
         # Update the detector's config with the new, optimal threshold
         detector.config.similarity_threshold = optimal_threshold
 
-    # 6. 测试阶段
+    # testing phase
     print("\n=== Testing Phase ===")
     test_results = await detector.detect_batch(test_texts)
 
-    # 7. 评估结果
+    # Assessment results
     test_predictions = test_results["predictions"]
     test_probabilities = test_results["probabilities"]
 
-    # 计算指标
+    # Calculation of indicators
     accuracy = accuracy_score(test_labels, test_predictions)
     auc = roc_auc_score(test_labels, test_probabilities)
     f1 = f1_score(test_labels, test_predictions)
@@ -1575,7 +1527,7 @@ async def main(
     print(f"Accuracy: {accuracy:.4f}")
     print(f"AUC: {auc:.4f}")
     print(f"F1 Scores: {f1:.4f}")
-    # 详细报告
+    # Detailed report
     print("\nClassification Report:")
     print(
         classification_report(
@@ -1583,7 +1535,7 @@ async def main(
         )
     )
 
-    # 混淆矩阵
+    # confusion matrix (math.)
     cm = confusion_matrix(test_labels, test_predictions)
     print("\nConfusion Matrix:")
     print(f"              Predicted")
@@ -1591,11 +1543,11 @@ async def main(
     print(f"Actual Human  {cm[0,0]:4d}  {cm[0,1]:4d}")
     print(f"       AI     {cm[1,0]:4d}  {cm[1,1]:4d}")
 
-    # 特征分析
+    # character analysis
     features_df = test_results["features"]
     similarity_scores = test_results["similarity_scores"]
 
-    # 分组统计
+    # Subgroup statistics
     human_scores = similarity_scores[np.array(test_labels) == 0]
     ai_scores = similarity_scores[np.array(test_labels) == 1]
 
@@ -1608,7 +1560,6 @@ async def main(
     print(f"  Mean: {np.mean(ai_scores):.3f}, Std: {np.std(ai_scores):.3f}")
     print(f"  Min: {np.min(ai_scores):.3f}, Max: {np.max(ai_scores):.3f}")
 
-    # 显示错误分类的例子
     print("\n=== Misclassified Examples ===")
     misclassified_idx = np.where(test_predictions != test_labels)[0]
 
@@ -1628,13 +1579,11 @@ async def main(
             f"Similarity: {similarity_scores[idx]:.3f}, Probability: {test_probabilities[idx]:.3f}"
         )
 
-    # 8. 保存缓存和模型
     if use_cache:
         with open(cache_path, "w") as f:
             json.dump(detector.cache, f)
         print(f"\nCache saved to {cache_path}")
 
-    # 保存模型
     model_path = f"enhanced_detector_{config.revision_model}.pkl"
     detector.save_model(model_path)
 
@@ -1652,9 +1601,7 @@ async def main(
 async def run_comparison_experiment(
     data_path: str = "finance", max_samples: Optional[int] = None
 ):
-    """
-    运行对比实验，比较不同配置的效果
-    """
+
     print("=== Comparison Experiment ===")
 
     results = {}
@@ -1741,7 +1688,6 @@ async def run_comparison_experiment(
         # ),
     }
 
-    # 比较结果
     # Run experiments
     for name, config in configurations.items():
         print(f"\n{'='*20} Running: {name} {'='*20}")
@@ -1777,36 +1723,33 @@ async def run_comparison_experiment(
     return results
 
 
-# 使用示例
 if __name__ == "__main__":
     import sys
 
-    # 解析命令行参数
     if len(sys.argv) > 1:
         mode = sys.argv[1]
     else:
         mode = "default"
 
     if mode == "compare":
-        # 运行对比实验
+
         print("Running comparison experiment...")
         asyncio.run(run_comparison_experiment(data_path="test", max_samples=None))
 
     elif mode == "quick":
-        # 快速测试
+
         print("Running quick test with sample data...")
         config = DetectionConfig(
             revision_model="gpt-3.5-turbo",
             embedding_model="all-MiniLM-L6-v2",
             perturbation_rate=0.15,
-            use_ml_classifier=False,  # 不训练分类器，只用阈值
+            use_ml_classifier=False,
         )
         asyncio.run(main(data_path="sample", max_samples=500, config=config))
 
     elif mode == "api":
         print("Running api experiment with finance dataset...")
         try:
-            # 尝试使用金融数据集
 
             config = DetectionConfig(
                 revision_model="gpt-3.5-turbo",  # t5-small,gpt-3.5-turbo,gpt2
@@ -1822,5 +1765,3 @@ if __name__ == "__main__":
             print(f"\nError with finance dataset: {e}")
             print("Falling back to sample dataset...")
             asyncio.run(main(data_path="sample", max_samples=200))  # use asyncio.run()
-
-    print("\n Experiment completed!")

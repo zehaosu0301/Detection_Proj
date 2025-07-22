@@ -1,0 +1,274 @@
+2025-07-19 02:38:16,544 - INFO - Logging setup complete. All output will be saved to ./result\output.log
+2025-07-19 02:38:16,544 - INFO - === Transformer Model Comparison Experiment ===
+2025-07-19 02:38:16,546 - INFO - 
+========================= Running Experiment: BERT =========================
+2025-07-19 02:38:25,676 - INFO - Use pytorch device_name: cuda:0
+2025-07-19 02:38:25,676 - INFO - Load pretrained SentenceTransformer: bert-base-uncased
+2025-07-19 02:38:26,002 - WARNING - No sentence-transformers model found with name bert-base-uncased. Creating a new one with mean pooling.
+2025-07-19 02:38:30,047 - INFO - Successfully loaded cache with 7844 entries from enhanced_cache_gpt-3.5-turbo.json
+2025-07-19 02:38:30,047 - INFO - Searching for finance data files...
+2025-07-19 02:38:30,437 - INFO - Loading finance datasets...
+2025-07-19 02:38:30,437 - INFO - Found files: ['revised_chatgpt', 'revised_human', 'original']
+2025-07-19 02:38:30,437 - INFO - Loading from: ./data\finance.jsonl
+2025-07-19 02:38:30,443 - INFO - Processed 1000 lines, extracted 2000 texts
+2025-07-19 02:38:30,450 - INFO - Processed 2000 lines, extracted 4000 texts
+2025-07-19 02:38:30,456 - INFO - Processed 3000 lines, extracted 6000 texts
+2025-07-19 02:38:30,462 - INFO - Successfully loaded 3933 JSON objects
+2025-07-19 02:38:30,464 - INFO - Total texts extracted: 7866
+2025-07-19 02:38:30,467 - INFO - 
+=== Dataset Summary ===
+2025-07-19 02:38:30,468 - INFO - Total samples: 7866
+2025-07-19 02:38:30,469 - INFO - Human texts: 3933
+2025-07-19 02:38:30,469 - INFO - ChatGPT texts: 3933
+2025-07-19 02:38:30,470 - INFO - Dataset balance: 50.0% human, 50.0% ChatGPT
+2025-07-19 02:38:30,471 - INFO - 
+Sample texts:
+2025-07-19 02:38:30,472 - INFO - 
+[Human]: In the United States you can't, because the average millennial in the United States has no opportunity to save money. Either you get a college education, then you will be burdened with a student loan....
+2025-07-19 02:38:30,473 - INFO - 
+[ChatGPT]: To determine your take-home pay if you claim 3 exemptions, you will need to calculate your federal income tax withholding and any other applicable deductions.First, you will need to determine your tax...
+2025-07-19 02:38:30,477 - INFO - Data prepared: 5506 training, 2360 testing.
+2025-07-19 03:44:39,052 - INFO - 
+--- Test Results for bert-base-uncased ---
+2025-07-19 03:44:39,052 - INFO - Accuracy: 0.9928
+2025-07-19 03:44:39,053 - INFO - AUC: 0.9999
+2025-07-19 03:44:39,054 - INFO - Weighted F1-Score: 0.9928
+2025-07-19 03:44:39,054 - INFO - 
+Classification Report:
+2025-07-19 03:44:39,061 - INFO - 
+              precision    recall  f1-score   support
+
+       Human     0.9991    0.9864    0.9928      1180
+          AI     0.9866    0.9992    0.9928      1180
+
+    accuracy                         0.9928      2360
+   macro avg     0.9929    0.9928    0.9928      2360
+weighted avg     0.9929    0.9928    0.9928      2360
+
+2025-07-19 03:44:39,062 - INFO - 
+========================= Running Experiment: DistilBERT =========================
+2025-07-19 03:44:39,535 - INFO - Use pytorch device_name: cuda:0
+2025-07-19 03:44:39,535 - INFO - Load pretrained SentenceTransformer: distilbert-base-uncased
+2025-07-19 03:44:45,382 - WARNING - No sentence-transformers model found with name distilbert-base-uncased. Creating a new one with mean pooling.
+2025-07-19 03:44:50,239 - INFO - Successfully loaded cache with 7844 entries from enhanced_cache_gpt-3.5-turbo.json
+2025-07-19 03:44:50,240 - INFO - Searching for finance data files...
+2025-07-19 03:44:50,642 - INFO - Loading finance datasets...
+2025-07-19 03:44:50,643 - INFO - Found files: ['revised_chatgpt', 'revised_human', 'original']
+2025-07-19 03:44:50,643 - INFO - Loading from: ./data\finance.jsonl
+2025-07-19 03:44:50,656 - INFO - Processed 1000 lines, extracted 2000 texts
+2025-07-19 03:44:50,662 - INFO - Processed 2000 lines, extracted 4000 texts
+2025-07-19 03:44:50,668 - INFO - Processed 3000 lines, extracted 6000 texts
+2025-07-19 03:44:50,673 - INFO - Successfully loaded 3933 JSON objects
+2025-07-19 03:44:50,673 - INFO - Total texts extracted: 7866
+2025-07-19 03:44:50,677 - INFO - 
+=== Dataset Summary ===
+2025-07-19 03:44:50,677 - INFO - Total samples: 7866
+2025-07-19 03:44:50,678 - INFO - Human texts: 3933
+2025-07-19 03:44:50,679 - INFO - ChatGPT texts: 3933
+2025-07-19 03:44:50,679 - INFO - Dataset balance: 50.0% human, 50.0% ChatGPT
+2025-07-19 03:44:50,680 - INFO - 
+Sample texts:
+2025-07-19 03:44:50,680 - INFO - 
+[Human]: In the United States you can't, because the average millennial in the United States has no opportunity to save money. Either you get a college education, then you will be burdened with a student loan....
+2025-07-19 03:44:50,681 - INFO - 
+[ChatGPT]: To determine your take-home pay if you claim 3 exemptions, you will need to calculate your federal income tax withholding and any other applicable deductions.First, you will need to determine your tax...
+2025-07-19 03:44:50,685 - INFO - Data prepared: 5506 training, 2360 testing.
+2025-07-19 04:52:20,812 - INFO - 
+--- Test Results for distilbert-base-uncased ---
+2025-07-19 04:52:20,812 - INFO - Accuracy: 0.9924
+2025-07-19 04:52:20,812 - INFO - AUC: 0.9997
+2025-07-19 04:52:20,813 - INFO - Weighted F1-Score: 0.9924
+2025-07-19 04:52:20,813 - INFO - 
+Classification Report:
+2025-07-19 04:52:20,817 - INFO - 
+              precision    recall  f1-score   support
+
+       Human     0.9983    0.9864    0.9923      1180
+          AI     0.9866    0.9983    0.9924      1180
+
+    accuracy                         0.9924      2360
+   macro avg     0.9924    0.9924    0.9924      2360
+weighted avg     0.9924    0.9924    0.9924      2360
+
+2025-07-19 04:52:20,817 - INFO - 
+========================= Running Experiment: RoBERTa =========================
+2025-07-19 04:52:21,250 - INFO - Use pytorch device_name: cuda:0
+2025-07-19 04:52:21,251 - INFO - Load pretrained SentenceTransformer: roberta-base
+2025-07-19 04:52:27,149 - WARNING - No sentence-transformers model found with name roberta-base. Creating a new one with mean pooling.
+2025-07-19 04:52:31,811 - INFO - Successfully loaded cache with 7844 entries from enhanced_cache_gpt-3.5-turbo.json
+2025-07-19 04:52:31,812 - INFO - Searching for finance data files...
+2025-07-19 04:52:32,246 - INFO - Loading finance datasets...
+2025-07-19 04:52:32,247 - INFO - Found files: ['revised_chatgpt', 'revised_human', 'original']
+2025-07-19 04:52:32,247 - INFO - Loading from: ./data\finance.jsonl
+2025-07-19 04:52:32,252 - INFO - Processed 1000 lines, extracted 2000 texts
+2025-07-19 04:52:32,258 - INFO - Processed 2000 lines, extracted 4000 texts
+2025-07-19 04:52:32,264 - INFO - Processed 3000 lines, extracted 6000 texts
+2025-07-19 04:52:32,270 - INFO - Successfully loaded 3933 JSON objects
+2025-07-19 04:52:32,270 - INFO - Total texts extracted: 7866
+2025-07-19 04:52:32,274 - INFO - 
+=== Dataset Summary ===
+2025-07-19 04:52:32,275 - INFO - Total samples: 7866
+2025-07-19 04:52:32,275 - INFO - Human texts: 3933
+2025-07-19 04:52:32,276 - INFO - ChatGPT texts: 3933
+2025-07-19 04:52:32,277 - INFO - Dataset balance: 50.0% human, 50.0% ChatGPT
+2025-07-19 04:52:32,277 - INFO - 
+Sample texts:
+2025-07-19 04:52:32,277 - INFO - 
+[Human]: In the United States you can't, because the average millennial in the United States has no opportunity to save money. Either you get a college education, then you will be burdened with a student loan....
+2025-07-19 04:52:32,278 - INFO - 
+[ChatGPT]: To determine your take-home pay if you claim 3 exemptions, you will need to calculate your federal income tax withholding and any other applicable deductions.First, you will need to determine your tax...
+2025-07-19 04:52:32,281 - INFO - Data prepared: 5506 training, 2360 testing.
+2025-07-19 07:33:12,224 - INFO - 
+--- Test Results for roberta-base ---
+2025-07-19 07:33:12,225 - INFO - Accuracy: 0.9962
+2025-07-19 07:33:12,225 - INFO - AUC: 1.0000
+2025-07-19 07:33:12,225 - INFO - Weighted F1-Score: 0.9962
+2025-07-19 07:33:12,226 - INFO - 
+Classification Report:
+2025-07-19 07:33:12,230 - INFO - 
+              precision    recall  f1-score   support
+
+       Human     0.9991    0.9932    0.9962      1180
+          AI     0.9933    0.9992    0.9962      1180
+
+    accuracy                         0.9962      2360
+   macro avg     0.9962    0.9962    0.9962      2360
+weighted avg     0.9962    0.9962    0.9962      2360
+
+2025-07-19 07:33:12,231 - INFO - 
+========================= Running Experiment: paraphrase-MiniLM-L6-v2 =========================
+2025-07-19 07:33:12,659 - INFO - Use pytorch device_name: cuda:0
+2025-07-19 07:33:12,659 - INFO - Load pretrained SentenceTransformer: paraphrase-MiniLM-L6-v2
+2025-07-19 07:33:25,417 - ERROR - 
+!!!!!! Experiment 'paraphrase-MiniLM-L6-v2' FAILED: paraphrase-MiniLM-L6-v2 is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>` !!!!!!
+2025-07-19 07:33:25,475 - ERROR - Traceback (most recent call last):
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\requests\models.py", line 1026, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/paraphrase-MiniLM-L6-v2/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\transformers\utils\hub.py", line 470, in cached_files
+    hf_hub_download(
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 1008, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 1115, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 1645, in _raise_on_head_call_error
+    raise head_call_error
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 1533, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 1450, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 286, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\file_download.py", line 310, in _request_wrapper
+    hf_raise_for_status(response)
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-687ad9c5-5a020b2353b5109179e3d900;f31975c2-59f8-4198-9529-6f680bd047d3)
+
+Repository Not Found for url: https://huggingface.co/paraphrase-MiniLM-L6-v2/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\suzehao\AppData\Local\Temp\ipykernel_11072\2631387028.py", line 265, in run_transformer_comparison
+    results[name] = await main_workflow_for_comparison(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\suzehao\AppData\Local\Temp\ipykernel_11072\2631387028.py", line 177, in main_workflow_for_comparison
+    detector = EnhancedAIDetector(config=config, dual_path_model_name=dual_path_model_name)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\suzehao\AppData\Local\Temp\ipykernel_11072\2631387028.py", line 26, in __init__
+    self.dual_path_detector = DualPathDetector(model_name=dual_path_model_name)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\suzehao\AppData\Local\Temp\ipykernel_11072\1652773297.py", line 175, in __init__
+    self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\transformers\models\auto\tokenization_auto.py", line 983, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\transformers\models\auto\tokenization_auto.py", line 815, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\transformers\utils\hub.py", line 312, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "f:\hk\gs\program\LLM-generated-text-detection-main\venv\Lib\site-packages\transformers\utils\hub.py", line 502, in cached_files
+    raise OSError(
+OSError: paraphrase-MiniLM-L6-v2 is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+
+2025-07-19 07:33:25,476 - INFO - 
+========================= Running Experiment: fine-tune model =========================
+2025-07-19 07:33:25,903 - INFO - Use pytorch device_name: cuda:0
+2025-07-19 07:33:25,904 - INFO - Load pretrained SentenceTransformer: ./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete
+2025-07-19 07:33:26,126 - INFO - Successfully loaded cache with 7844 entries from enhanced_cache_gpt-3.5-turbo.json
+2025-07-19 07:33:26,126 - INFO - Searching for finance data files...
+2025-07-19 07:33:26,511 - INFO - Loading finance datasets...
+2025-07-19 07:33:26,512 - INFO - Found files: ['revised_chatgpt', 'revised_human', 'original']
+2025-07-19 07:33:26,512 - INFO - Loading from: ./data\finance.jsonl
+2025-07-19 07:33:26,518 - INFO - Processed 1000 lines, extracted 2000 texts
+2025-07-19 07:33:26,524 - INFO - Processed 2000 lines, extracted 4000 texts
+2025-07-19 07:33:26,529 - INFO - Processed 3000 lines, extracted 6000 texts
+2025-07-19 07:33:26,535 - INFO - Successfully loaded 3933 JSON objects
+2025-07-19 07:33:26,535 - INFO - Total texts extracted: 7866
+2025-07-19 07:33:26,539 - INFO - 
+=== Dataset Summary ===
+2025-07-19 07:33:26,539 - INFO - Total samples: 7866
+2025-07-19 07:33:26,540 - INFO - Human texts: 3933
+2025-07-19 07:33:26,541 - INFO - ChatGPT texts: 3933
+2025-07-19 07:33:26,541 - INFO - Dataset balance: 50.0% human, 50.0% ChatGPT
+2025-07-19 07:33:26,541 - INFO - 
+Sample texts:
+2025-07-19 07:33:26,542 - INFO - 
+[Human]: In the United States you can't, because the average millennial in the United States has no opportunity to save money. Either you get a college education, then you will be burdened with a student loan....
+2025-07-19 07:33:26,543 - INFO - 
+[ChatGPT]: To determine your take-home pay if you claim 3 exemptions, you will need to calculate your federal income tax withholding and any other applicable deductions.First, you will need to determine your tax...
+2025-07-19 07:33:26,545 - INFO - Data prepared: 5506 training, 2360 testing.
+2025-07-19 08:48:52,654 - INFO - 
+--- Test Results for ./models/paraphrase-MiniLM-L6-v2-ai-detector-incomplete ---
+2025-07-19 08:48:52,655 - INFO - Accuracy: 0.9898
+2025-07-19 08:48:52,655 - INFO - AUC: 0.9998
+2025-07-19 08:48:52,655 - INFO - Weighted F1-Score: 0.9898
+2025-07-19 08:48:52,655 - INFO - 
+Classification Report:
+2025-07-19 08:48:52,661 - INFO - 
+              precision    recall  f1-score   support
+
+       Human     0.9991    0.9805    0.9897      1180
+          AI     0.9809    0.9992    0.9899      1180
+
+    accuracy                         0.9898      2360
+   macro avg     0.9900    0.9898    0.9898      2360
+weighted avg     0.9900    0.9898    0.9898      2360
+
+2025-07-19 08:48:52,662 - INFO - 
+
+========================= Final Comparison Summary =========================
+2025-07-19 08:48:52,664 - INFO - 
+  Configuration Accuracy    AUC F1-Score
+           BERT   0.9928 0.9999   0.9928
+     DistilBERT   0.9924 0.9997   0.9924
+        RoBERTa   0.9962 1.0000   0.9962
+fine-tune model   0.9898 0.9998   0.9898
+2025-07-19 08:48:52,664 - INFO - 
+
+Generating visualizations...

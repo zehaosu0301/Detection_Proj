@@ -87,7 +87,7 @@ except:
 # 1. CONFIGURATION AND LOGGING
 @dataclass
 class DetectionConfig:
-    """检测配置类"""
+    """Detect configuration classes"""
 
     # Model selection
     revision_model: str = "t5-small"
@@ -119,7 +119,7 @@ class DetectionConfig:
 
 
 def setup_logging(output_dir: str = "./result"):
-    """设置日志系统"""
+    """Set up the logging system"""
     log_file_path = os.path.join(output_dir, "dtdf_dsff_output.log")
     os.makedirs(output_dir, exist_ok=True)
 
@@ -145,14 +145,14 @@ def setup_logging(output_dir: str = "./result"):
 
 # 2. ENHANCED TEXT PERTURBER
 class EnhancedTextPerturber:
-    """增强的文本扰动器"""
+    """Enhanced text scrambler"""
 
     def __init__(self, config: DetectionConfig):
         self.config = config
         self._init_augmenters()
 
     def _init_augmenters(self):
-        """初始化各种扰动器"""
+        """Initialize various perturbators"""
         self.augmenters = {
             "synonym": naw.SynonymAug(
                 aug_src="wordnet", aug_p=self.config.perturbation_rate
@@ -169,7 +169,7 @@ class EnhancedTextPerturber:
         }
 
     def perturb(self, text: str, method: Optional[str] = None) -> str:
-        """智能扰动策略"""
+        """Intelligent perturbation strategies"""
         if method is None:
             method = np.random.choice(self.config.perturbation_methods)
 
@@ -186,7 +186,7 @@ class EnhancedTextPerturber:
             return self._simple_perturb(text)
 
     def _mixed_perturbation(self, text: str) -> str:
-        """混合多种扰动方法"""
+        """Mix multiple perturbation methods"""
         sentences = sent_tokenize(text)
         perturbed_sentences = []
 
@@ -204,7 +204,7 @@ class EnhancedTextPerturber:
         return " ".join(perturbed_sentences)
 
     def _simple_perturb(self, text: str) -> str:
-        """简单扰动作为后备"""
+        """Simple perturbation as a backup"""
         words = text.split()
         num_changes = max(1, int(len(words) * self.config.perturbation_rate))
         indices = np.random.choice(
@@ -219,13 +219,13 @@ class EnhancedTextPerturber:
         return " ".join(words)
 
     def _backtranslate(self, text: str) -> str:
-        """反向翻译（需要翻译API）"""
+
         return text
 
 
 # 3. ENHANCED LLM REVISER
 class EnhancedLLMReviser:
-    """增强的LLM重写器"""
+    """Enhanced LLM rewriter"""
 
     def __init__(self, config: DetectionConfig):
         self.config = config
@@ -236,7 +236,7 @@ class EnhancedLLMReviser:
         self._init_reviser()
 
     def _init_reviser(self):
-        """根据配置初始化重写模型或API客户端"""
+        """Initialize the rewrite model or API client based on the configuration"""
         model_name = self.config.revision_model
 
         if model_name.startswith("t5"):
@@ -256,7 +256,7 @@ class EnhancedLLMReviser:
             api_key = self.config.api_key or os.getenv("OPENAI_API_KEY")
             if not api_key:
                 raise ValueError(
-                    "请在DetectionConfig中提供api_key或设置OPENAI_API_KEY环境变量"
+                    "Please provide api_key or set OPENAI_API_KEY environment variable in DetectionConfig"
                 )
 
             self.client = AsyncOpenAI(api_key=api_key, base_url=self.config.base_url)
@@ -273,7 +273,7 @@ class EnhancedLLMReviser:
     async def revise(
         self, original_text: str, perturbed_text: str, cache: Dict[str, str]
     ) -> str:
-        """使用LLM重写文本"""
+        """Rewrite text using LLMs"""
         cache_key = hashlib.md5(
             f"{original_text}_{self.config.revision_model}".encode()
         ).hexdigest()
@@ -305,7 +305,7 @@ class EnhancedLLMReviser:
             return fallback_revision
 
     def _revise_with_t5(self, text: str) -> str:
-        """使用T5模型重写"""
+        """Rewrite with the T5 model"""
         prompt = f"paraphrase: {text}"
         inputs = self.tokenizer.encode(
             prompt, return_tensors="pt", max_length=512, truncation=True
@@ -325,7 +325,7 @@ class EnhancedLLMReviser:
         return revised
 
     def _revise_with_gpt2(self, text: str) -> str:
-        """使用GPT-2模型重写"""
+        """Rewritten using the GPT-2 model"""
         try:
             prompt_templates = [
                 f"Paraphrase the following text while keeping the same meaning: {text}\n\nParaphrased version:",
@@ -385,7 +385,7 @@ class EnhancedLLMReviser:
             return text
 
     async def _revise_with_api(self, text: str) -> str:
-        """使用OpenAI API重写"""
+        """Rewritten using OpenAI API"""
         if not self.client:
             raise ValueError("OpenAI client not initialized.")
 
@@ -426,7 +426,7 @@ The more casual or informal the original text, the more changes you should make.
         return text
 
     def _rule_based_revision(self, text: str) -> str:
-        """基于规则的重写"""
+        """Rule-based rewrites"""
         import re
 
         sentences = sent_tokenize(text)
@@ -452,7 +452,7 @@ The more casual or informal the original text, the more changes you should make.
         return " ".join(revised_sentences)
 
     def _reorder_sentences(self, sentences: List[str]) -> List[str]:
-        """智能句子重排"""
+        """Smart sentence rearrangement"""
         if len(sentences) <= 2:
             return sentences
 
@@ -748,7 +748,6 @@ class DSFFModel(nn.Module):
 
 # 6. STATISTICAL FEATURE EXTRACTOR
 class MultiFeatureExtractor:
-    """多维度特征提取器（保留统计特征用于对比）"""
 
     def __init__(self, config: DetectionConfig):
         self.config = config
@@ -764,14 +763,14 @@ class MultiFeatureExtractor:
         logging.info(f"Total trainable parameters: {total_params:,}")
 
     def _init_linguistic_features(self):
-        """初始化语言学特征提取"""
+        """Initialize linguistic feature extraction"""
         try:
             self.stop_words = set(stopwords.words("english"))
         except:
             self.stop_words = set()
 
     def extract_features(self, original: str, revised: str) -> Dict[str, float]:
-        """提取多维度特征"""
+        """Extract multi-dimensional features"""
         features = {}
 
         # 1. Semantic similarity
@@ -794,7 +793,7 @@ class MultiFeatureExtractor:
         return features
 
     def _compute_semantic_similarity(self, text1: str, text2: str) -> float:
-        """计算语义相似度"""
+        """Calculate semantic similarity"""
         emb1 = self.sentence_model.encode(text1)
         emb2 = self.sentence_model.encode(text2)
 
@@ -805,7 +804,7 @@ class MultiFeatureExtractor:
     def _extract_lexical_features(
         self, original: str, revised: str
     ) -> Dict[str, float]:
-        """提取词汇级特征"""
+        """Extract lexical-level features"""
         orig_words = set(word_tokenize(original.lower()))
         rev_words = set(word_tokenize(revised.lower()))
 
@@ -836,7 +835,7 @@ class MultiFeatureExtractor:
     def _extract_syntactic_features(
         self, original: str, revised: str
     ) -> Dict[str, float]:
-        """提取句法特征"""
+        """Extract syntactic features"""
         orig_sents = sent_tokenize(original)
         rev_sents = sent_tokenize(revised)
 
@@ -875,7 +874,7 @@ class MultiFeatureExtractor:
     def _extract_stylistic_features(
         self, original: str, revised: str
     ) -> Dict[str, float]:
-        """提取风格特征"""
+        """Extract style features"""
         features = {}
 
         # Punctuation usage changes
@@ -912,7 +911,7 @@ class MultiFeatureExtractor:
         return features
 
     def _extract_edit_features(self, original: str, revised: str) -> Dict[str, float]:
-        """提取编辑距离相关特征"""
+        """Extract edit distance-related features"""
         from difflib import SequenceMatcher
 
         # Character-level similarity
@@ -934,7 +933,7 @@ class MultiFeatureExtractor:
 
 # 7. DTDF FEATURE EXTRACTOR
 class DTDFFeatureExtractor:
-    """DTDF特征提取器"""
+    """DTDF feature extractor"""
 
     def __init__(self, config: DetectionConfig, device: str):
         self.device = device
@@ -988,7 +987,7 @@ class DTDFFeatureExtractor:
 
 # 8. CUSTOM DATA LOADER
 class CustomDataLoader:
-    """数据加载器类"""
+    """Data loader class"""
 
     def __init__(self, data_dir: str = "./data"):
         self.data_dir = data_dir
@@ -997,7 +996,7 @@ class CustomDataLoader:
             logging.info(f"Created data directory: {data_dir}")
 
     def load_data(self, path: str) -> pd.DataFrame:
-        """读取数据集"""
+        """Read the dataset"""
         if path == "finance":
             return self.load_finance_dataset()
         elif path == "sample":
@@ -1043,7 +1042,7 @@ class CustomDataLoader:
             return self.create_sample_dataset()
 
     def find_finance_data_files(self) -> Dict[str, str]:
-        """查找金融数据集文件"""
+        """Find financial dataset files"""
         logging.info("Searching for finance data files...")
 
         possible_paths = [
@@ -1074,7 +1073,7 @@ class CustomDataLoader:
         return files_found
 
     def load_finance_dataset(self) -> pd.DataFrame:
-        """加载金融数据集"""
+        """Load the financial dataset"""
         files = self.find_finance_data_files()
 
         logging.info("Loading finance datasets...")
@@ -1247,7 +1246,7 @@ class CustomDataLoader:
         return df[["id", "text", "label"]]
 
     def create_sample_dataset(self) -> pd.DataFrame:
-        """创建示例数据集用于测试"""
+        """Create a sample dataset for testing"""
         sample_data = {
             "id": range(6),
             "text": [
@@ -1268,7 +1267,7 @@ class CustomDataLoader:
 
 # 9. DTDF-DSFF DATASET AND DETECTOR
 class DTDFDSFFDataset(Dataset):
-    """DTDF-DSFF数据集"""
+    """DTDF-DSFF dataset"""
 
     def __init__(
         self,
@@ -1297,7 +1296,7 @@ class DTDFDSFFDataset(Dataset):
 
 
 class AITextDetector:
-    """基础AI文本检测器（用于特征提取和对比）"""
+    """Basic AI text detector (for feature extraction and comparison)"""
 
     def __init__(self, config: DetectionConfig, device: str):
         self.config = config
@@ -1313,7 +1312,7 @@ class AITextDetector:
     async def detect_batch(
         self, texts: List[str], labels: Optional[List[int]] = None
     ) -> Dict[str, np.ndarray]:
-        """批量检测（用于统计特征对比）"""
+        """Batch testing (for statistical feature comparison)"""
         all_features = []
         all_scores = []
 
@@ -1387,7 +1386,7 @@ class AITextDetector:
         }
 
     def _train_classifier(self, features: np.ndarray, labels: List[int]):
-        """训练机器学习分类器"""
+        """Training Machine Learning Classifiers"""
         print("Training classifier...")
 
         features_scaled = self.scaler.fit_transform(features)
@@ -1413,7 +1412,7 @@ class AITextDetector:
 
 
 class DTDFDSFFDetector:
-    """完整的DTDF-DSFF检测器"""
+    """Complete DTDF-DSFF detector"""
 
     def __init__(self, config: DetectionConfig, device: str = None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
@@ -1475,7 +1474,7 @@ class DTDFDSFFDetector:
         dtdf_features: np.ndarray,
         labels: List[int],
     ) -> Tuple[Dataset, Dataset]:
-        """准备训练和验证数据集"""
+        """Preparing training and validation datasets"""
         # Data split
         X_train, X_val, emb_train, emb_val, dtdf_train, dtdf_val, y_train, y_val = (
             train_test_split(
@@ -1504,7 +1503,7 @@ class DTDFDSFFDetector:
         learning_rate: float = 2e-4,
         save_path: str = "best_dtdf_dsff_model.pt",
     ):
-        """训练DSFF模型"""
+        """Training the DSFF model"""
         # Initialize model
         if self.dsff_model is None:
             sample_embedding = train_dataset[0]["original_embeddings"]
@@ -1655,7 +1654,7 @@ class DTDFDSFFDetector:
         return np.array(all_predictions), np.array(all_probabilities)
 
     def save_model(self, path: str):
-        """保存模型"""
+        """Save the model"""
         torch.save(
             {
                 "model_state_dict": self.dsff_model.state_dict(),
@@ -1666,7 +1665,7 @@ class DTDFDSFFDetector:
         )
 
     def load_model(self, path: str):
-        """加载模型"""
+        """Loading Models"""
         checkpoint = torch.load(path, map_location=self.device)
 
         # Reinitialize model (need to know dimensions)
@@ -1680,7 +1679,7 @@ class DTDFDSFFDetector:
 
 # 10. PLOTTING AND EVALUATION FUNCTIONS
 def plot_roc_curves(results: Dict, output_dir: str = "./result"):
-    """绘制并保存ROC曲线"""
+    """Plot and save the ROC curve"""
     plt.figure(figsize=(10, 8))
     for name, result_data in results.items():
         if "test_results" in result_data:
@@ -1706,7 +1705,7 @@ def plot_roc_curves(results: Dict, output_dir: str = "./result"):
 
 
 def plot_precision_recall_curves(results: Dict, output_dir: str = "./result"):
-    """绘制并保存Precision-Recall曲线"""
+
     plt.figure(figsize=(10, 8))
     for name, result_data in results.items():
         if "test_results" in result_data:
@@ -1728,7 +1727,7 @@ def plot_precision_recall_curves(results: Dict, output_dir: str = "./result"):
 
 
 def plot_confusion_matrices(results: Dict, output_dir: str = "./result"):
-    """绘制并保存混淆矩阵"""
+
     n_results = len(results)
     fig, axes = plt.subplots(1, n_results, figsize=(6 * n_results, 5), squeeze=False)
 
@@ -1761,7 +1760,7 @@ def plot_confusion_matrices(results: Dict, output_dir: str = "./result"):
 
 
 def plot_classification_metrics(results: Dict, output_dir: str = "./result"):
-    """绘制并保存分类指标对比"""
+
     metrics_data = []
     for name, result_data in results.items():
         if "test_results" in result_data:
@@ -1801,7 +1800,7 @@ def plot_classification_metrics(results: Dict, output_dir: str = "./result"):
 
 
 def find_optimal_threshold(labels: List[int], scores: np.ndarray) -> float:
-    """找到最优分类阈值"""
+
     fpr, tpr, thresholds = roc_curve(labels, scores)
     optimal_idx = np.argmax(tpr - fpr)
     optimal_threshold = thresholds[optimal_idx]
@@ -1818,7 +1817,6 @@ async def run_dtdf_dsff_experiment(
     batch_size: int = 16,
     use_cache: bool = True,
 ):
-    """运行完整的DTDF-DSFF实验"""
 
     setup_logging()
     logging.info("=== DTDF-DSFF AI Text Detection Experiment ===")
@@ -2114,10 +2112,6 @@ async def run_comparison_experiment(
 
     return results
 
-
-# ==============================================================================
-# 12. USAGE EXAMPLES
-# ==============================================================================
 
 if __name__ == "__main__":
 

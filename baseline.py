@@ -14,7 +14,7 @@ from tqdm import tqdm
 import logging
 from itertools import cycle
 
-# Basic logger configuration
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -138,7 +138,6 @@ def compare_base_models_performance(
             if not true_labels:
                 true_labels = current_labels
 
-            # --- METRICS CALCULATION ---
             # 1. Calculate ROC and AUC (threshold-independent)
             fpr, tpr, thresholds = roc_curve(true_labels, sims)
             auc = roc_auc_score(true_labels, sims)
@@ -205,7 +204,6 @@ def compare_base_models_performance(
     plt.show()
 
 
-# --- Example Usage ---
 if __name__ == "__main__":
 
     MODELS_TO_COMPARE = [
@@ -213,12 +211,12 @@ if __name__ == "__main__":
         "bert-base-uncased",
         "roberta-base",
         "google-t5/t5-small",
-        "gpt2",  # This model will now work
+        "gpt2",
     ]
     DATA_FILE_PATH = "./data/finance.jsonl"
 
     compare_base_models_performance(
         model_names=MODELS_TO_COMPARE,
         data_path=DATA_FILE_PATH,
-        test_ratio=1.0,  # Use all data for test in this small example
+        test_ratio=1.0,
     )
